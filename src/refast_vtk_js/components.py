@@ -65,6 +65,7 @@ class View(Component):
         auto_center_of_rotation: bool = True,
         style: dict[str, Any] | None = None,
         render_window_style: dict[str, Any] | None = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -78,6 +79,8 @@ class View(Component):
         self.auto_center_of_rotation = auto_center_of_rotation
         self.style = style
         self.render_window_style = render_window_style
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -132,6 +135,7 @@ class MultiViewRoot(Component):
         self,
         style: dict[str, Any] | None = None,
         render_window_style: dict[str, Any] | None = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -139,6 +143,8 @@ class MultiViewRoot(Component):
         super().__init__(id=id, class_name=class_name, **props)
         self.style = style
         self.render_window_style = render_window_style
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -213,6 +219,7 @@ class GeometryRepresentation(Component):
         scalar_bar_title: bool = False,
         scalar_bar_style: dict[str, Any] | None = None,
         on_data_available: Any = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -229,6 +236,8 @@ class GeometryRepresentation(Component):
         self.scalar_bar_title = scalar_bar_title
         self.scalar_bar_style = scalar_bar_style
         self.on_data_available = on_data_available
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -285,6 +294,7 @@ class Geometry2DRepresentation(Component):
         color_data_range: list[float] | None = None,
         transform_coordinate: dict[str, Any] | None = None,
         on_data_available: Any = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -297,6 +307,8 @@ class Geometry2DRepresentation(Component):
         self.color_data_range = color_data_range
         self.transform_coordinate = transform_coordinate
         self.on_data_available = on_data_available
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -378,6 +390,7 @@ class VolumeRepresentation(Component):
         color_data_range: str | list[float] = "auto",
         on_data_available: Any = None,
         on_data_changed: Any = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -390,6 +403,8 @@ class VolumeRepresentation(Component):
         self.color_data_range = color_data_range
         self.on_data_available = on_data_available
         self.on_data_changed = on_data_changed
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -471,6 +486,7 @@ class SliceRepresentation(Component):
         y_slice: float | None = None,
         z_slice: float | None = None,
         on_data_available: Any = None,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -488,6 +504,8 @@ class SliceRepresentation(Component):
         self.y_slice = y_slice
         self.z_slice = z_slice
         self.on_data_available = on_data_available
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -572,6 +590,7 @@ class PolyData(Component):
         strips: list[int] | dict[str, Any] | None = None,
         connectivity: Literal["manual", "points", "triangles", "strips"] = "manual",
         port: int = 0,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -584,6 +603,8 @@ class PolyData(Component):
         self.strips = strips
         self.connectivity = connectivity
         self.port = port
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -651,6 +672,7 @@ class ImageData(Component):
         origin: list[float] | None = None,
         direction: list[float] | None = None,
         port: int = 0,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -661,6 +683,8 @@ class ImageData(Component):
         self.origin = origin
         self.direction = direction
         self.port = port
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -830,11 +854,14 @@ class PointData(Component):
 
     def __init__(
         self,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
     ):
         super().__init__(id=id, class_name=class_name, **props)
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -879,11 +906,14 @@ class CellData(Component):
 
     def __init__(
         self,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
     ):
         super().__init__(id=id, class_name=class_name, **props)
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -910,11 +940,14 @@ class FieldData(Component):
 
     def __init__(
         self,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
     ):
         super().__init__(id=id, class_name=class_name, **props)
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -977,6 +1010,7 @@ class Algorithm(Component):
         vtk_class: str = "",
         state: dict[str, Any] | None = None,
         port: int = 0,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -985,6 +1019,8 @@ class Algorithm(Component):
         self.vtk_class = vtk_class
         self.state = state
         self.port = port
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -1049,6 +1085,7 @@ class Reader(Component):
         base64_array_buffer: str | None = None,
         text: str | None = None,
         port: int = 0,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -1061,6 +1098,8 @@ class Reader(Component):
         self.base64_array_buffer = base64_array_buffer
         self.text = text
         self.port = port
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -1269,11 +1308,14 @@ class ShareDataSetRoot(Component):
 
     def __init__(
         self,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
     ):
         super().__init__(id=id, class_name=class_name, **props)
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
@@ -1302,12 +1344,15 @@ class RegisterDataSet(Component):
     def __init__(
         self,
         dataset_id: str,
+        children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
     ):
         super().__init__(id=id, class_name=class_name, **props)
         self.dataset_id = dataset_id
+        if children:
+            self._children = children
 
     def render(self) -> dict[str, Any]:
         return {
