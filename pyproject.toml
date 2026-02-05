@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "refast_vtk_js"
+version = "0.1.0"
+description = "Refast extension for vtk"
+readme = "README.md"
+authors = [
+  { name = "Najeem Muhammed", email = "najeem@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "refast>=0.1.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/idling-mind/refast_vtk_js"
+"Bug Tracker" = "https://github.com/idling-mind/refast_vtk_js/issues"
+"Documentation" = "https://github.com/idling-mind/refast_vtk_js#readme"
+
+# Entry point for auto-discovery by Refast
+[project.entry-points."refast.extensions"]
+refast_vtk_js = "refast_vtk_js:VtkExtension"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/refast_vtk_js"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/",
+    "frontend/",
+    "README.md",
+    "pyproject.toml",
+    "hatch_build.py",
+]
+
+[tool.hatch.build.hooks.custom]
+# Custom build hook defined in hatch_build.py
+# Runs npm install && npm run build before packaging
+path = "hatch_build.py"
