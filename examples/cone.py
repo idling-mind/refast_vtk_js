@@ -37,7 +37,7 @@ def home(ctx: Context):
                 class_name="mb-4 text-muted-foreground",
             ),
             View(
-                background=[0.2, 0.2, 0.25],
+                background=[0.9, 0.9, 1.0],
                 style={"width": "100%", "height": "400px"},
                 children=[
                     GeometryRepresentation(
