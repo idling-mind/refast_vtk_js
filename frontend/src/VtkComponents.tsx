@@ -14,6 +14,48 @@ import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Geometry';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Glyph';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Volume';
 
+// Import color transfer function presets (required for colorMapPreset to work)
+// The ColorMaps module contains the preset registry that VolumeRepresentation uses
+import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
+
+// Force initialization of color map presets by accessing the registry
+// This ensures presets are registered before any component tries to use them
+const presetNames = vtkColorMaps.rgbPresetNames;
+console.log(`[VTK] Color map presets loaded: ${presetNames.length} presets available`);
+
+// Also expose to window for debugging
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__vtkColorMaps = vtkColorMaps;
+  (window as unknown as Record<string, unknown>).__vtkColorMapPresetNames = presetNames;
+}
+
+// Default fallback preset that is guaranteed to exist in both vtk.js and react-vtk-js color maps
+const DEFAULT_COLOR_PRESET = 'erdc_rainbow_bright';
+
+/**
+ * Validates a color map preset name and returns a valid preset name.
+ * Falls back to DEFAULT_COLOR_PRESET if the requested preset doesn't exist.
+ * This prevents "Cannot read properties of undefined (reading 'ColorSpace')" errors.
+ */
+function getValidColorMapPreset(presetName: string | undefined): string {
+  if (!presetName) {
+    return DEFAULT_COLOR_PRESET;
+  }
+  
+  // Check if preset exists in the vtk.js ColorMaps registry
+  const preset = vtkColorMaps.getPresetByName(presetName);
+  if (!preset) {
+    console.warn(
+      `[VTK] Color map preset "${presetName}" not found. ` +
+      `Falling back to "${DEFAULT_COLOR_PRESET}". ` +
+      `Available presets: ${presetNames.slice(0, 5).join(', ')}...`
+    );
+    return DEFAULT_COLOR_PRESET;
+  }
+  
+  return presetName;
+}
+
 // Import react-vtk-js components
 import {
   View,
@@ -252,6 +294,9 @@ export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresen
       invokeCallback(onDataAvailable, {});
     }, [onDataAvailable]);
 
+    // Validate color map preset to prevent "Cannot read properties of undefined" error
+    const validColorMapPreset = colorMapPreset ? getValidColorMapPreset(colorMapPreset) : undefined;
+
     return (
       <GeometryRepresentation
         ref={ref}
@@ -259,7 +304,7 @@ export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresen
         actor={actor}
         mapper={mapper}
         property={property}
-        colorMapPreset={colorMapPreset}
+        colorMapPreset={validColorMapPreset}
         colorDataRange={colorDataRange}
         showCubeAxes={showCubeAxes}
         cubeAxesStyle={cubeAxesStyle}
@@ -310,6 +355,9 @@ export const VtkGeometry2DRepresentation = forwardRef<unknown, VtkGeometry2DRepr
       invokeCallback(onDataAvailable, {});
     }, [onDataAvailable]);
 
+    // Validate color map preset to prevent "Cannot read properties of undefined" error
+    const validColorMapPreset = colorMapPreset ? getValidColorMapPreset(colorMapPreset) : undefined;
+
     return (
       <Geometry2DRepresentation
         ref={ref}
@@ -317,7 +365,7 @@ export const VtkGeometry2DRepresentation = forwardRef<unknown, VtkGeometry2DRepr
         actor={actor}
         mapper={mapper}
         property={property}
-        colorMapPreset={colorMapPreset}
+        colorMapPreset={validColorMapPreset}
         colorDataRange={colorDataRange}
         transformCoordinate={transformCoordinate}
         onDataAvailable={onDataAvailable ? handleDataAvailable : undefined}
@@ -368,6 +416,9 @@ export const VtkVolumeRepresentation = forwardRef<unknown, VtkVolumeRepresentati
       invokeCallback(onDataChanged, {});
     }, [onDataChanged]);
 
+    // Validate color map preset to prevent "Cannot read properties of undefined" error
+    const validColorMapPreset = colorMapPreset ? getValidColorMapPreset(colorMapPreset) : undefined;
+
     return (
       <VolumeRepresentation
         ref={ref}
@@ -375,7 +426,7 @@ export const VtkVolumeRepresentation = forwardRef<unknown, VtkVolumeRepresentati
         actor={actor}
         mapper={mapper}
         property={property}
-        colorMapPreset={colorMapPreset}
+        colorMapPreset={validColorMapPreset}
         colorDataRange={colorDataRange}
         onDataAvailable={onDataAvailable ? handleDataAvailable : undefined}
         onDataChanged={onDataChanged ? handleDataChanged : undefined}
@@ -432,6 +483,9 @@ export const VtkSliceRepresentation = forwardRef<unknown, VtkSliceRepresentation
       invokeCallback(onDataAvailable, {});
     }, [onDataAvailable]);
 
+    // Validate color map preset to prevent "Cannot read properties of undefined" error
+    const validColorMapPreset = colorMapPreset ? getValidColorMapPreset(colorMapPreset) : undefined;
+
     return (
       <SliceRepresentation
         ref={ref}
@@ -439,7 +493,7 @@ export const VtkSliceRepresentation = forwardRef<unknown, VtkSliceRepresentation
         actor={actor}
         mapper={mapper}
         property={property}
-        colorMapPreset={colorMapPreset}
+        colorMapPreset={validColorMapPreset}
         colorDataRange={colorDataRange}
         iSlice={iSlice}
         jSlice={jSlice}
