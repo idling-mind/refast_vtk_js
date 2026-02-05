@@ -14,6 +14,18 @@ import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Geometry';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Glyph';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Volume';
 
+// Import VTK.js sources/filters (needed for Algorithm component to find them by string name)
+// These imports register the classes with vtk.js factory, enabling vtkClass="vtkConeSource" etc.
+import '@kitware/vtk.js/Filters/Sources/ConeSource';
+import '@kitware/vtk.js/Filters/Sources/SphereSource';
+import '@kitware/vtk.js/Filters/Sources/CubeSource';
+import '@kitware/vtk.js/Filters/Sources/CylinderSource';
+import '@kitware/vtk.js/Filters/Sources/PlaneSource';
+import '@kitware/vtk.js/Filters/Sources/LineSource';
+import '@kitware/vtk.js/Filters/Sources/PointSource';
+import '@kitware/vtk.js/Filters/Sources/CircleSource';
+import '@kitware/vtk.js/Filters/Sources/ArrowSource';
+
 // Import color transfer function presets (required for colorMapPreset to work)
 // The ColorMaps module contains the preset registry that VolumeRepresentation uses
 import vtkColorMaps from '@kitware/vtk.js/Rendering/Core/ColorTransferFunction/ColorMaps';
