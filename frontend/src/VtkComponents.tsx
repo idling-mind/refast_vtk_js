@@ -6,7 +6,7 @@
  * and callback invocation.
  */
 
-import React, { forwardRef, useCallback } from 'react';
+import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
 
 // Import VTK.js rendering profiles
 import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
@@ -171,6 +171,109 @@ function invokeCallback(
 
 
 // ============================================================================
+// Camera Sync Manager
+// ============================================================================
+
+/**
+ * Global manager for synchronizing camera state between views that share
+ * the same syncGroup.  When a user rotates/pans/zooms one view, all other
+ * views in the same sync group mirror the camera change.
+ */
+
+interface CameraSyncEntry {
+  viewId: string;
+  getCamera: () => any;
+  requestRender: () => void;
+}
+
+const cameraSyncGroups = new Map<string, Set<CameraSyncEntry>>();
+let isCameraSyncing = false;
+
+/**
+ * Register a view in a camera sync group.
+ * If the group already has members, the new view's camera is immediately
+ * synchronised to match the existing views.
+ * Returns an unregister function.
+ */
+function registerCameraSync(group: string, entry: CameraSyncEntry): () => void {
+  if (!cameraSyncGroups.has(group)) {
+    cameraSyncGroups.set(group, new Set());
+  }
+
+  const groupSet = cameraSyncGroups.get(group)!;
+
+  // Sync the newcomer's camera to match existing members
+  if (groupSet.size > 0) {
+    const existingEntry = groupSet.values().next().value;
+    if (existingEntry) {
+      const srcCam = existingEntry.getCamera();
+      const dstCam = entry.getCamera();
+      if (srcCam && dstCam) {
+        isCameraSyncing = true;
+        dstCam.setPosition(...srcCam.getPosition());
+        dstCam.setFocalPoint(...srcCam.getFocalPoint());
+        dstCam.setViewUp(...srcCam.getViewUp());
+        dstCam.setClippingRange(...srcCam.getClippingRange());
+        dstCam.setParallelScale(srcCam.getParallelScale());
+        dstCam.setViewAngle(srcCam.getViewAngle());
+        entry.requestRender();
+        isCameraSyncing = false;
+      }
+    }
+  }
+
+  groupSet.add(entry);
+
+  return () => {
+    groupSet.delete(entry);
+    if (groupSet.size === 0) {
+      cameraSyncGroups.delete(group);
+    }
+  };
+}
+
+/**
+ * Copy the sourceCamera's state to every other view in the same sync group.
+ */
+function broadcastCameraState(
+  group: string,
+  sourceId: string,
+  sourceCamera: any,
+): void {
+  if (isCameraSyncing) return;
+  isCameraSyncing = true;
+
+  try {
+    const entries = cameraSyncGroups.get(group);
+    if (!entries) return;
+
+    const position = sourceCamera.getPosition();
+    const focalPoint = sourceCamera.getFocalPoint();
+    const viewUp = sourceCamera.getViewUp();
+    const clippingRange = sourceCamera.getClippingRange();
+    const parallelScale = sourceCamera.getParallelScale();
+    const viewAngle = sourceCamera.getViewAngle();
+
+    for (const entry of entries) {
+      if (entry.viewId === sourceId) continue;
+      const cam = entry.getCamera();
+      if (!cam) continue;
+
+      cam.setPosition(...position);
+      cam.setFocalPoint(...focalPoint);
+      cam.setViewUp(...viewUp);
+      cam.setClippingRange(...clippingRange);
+      cam.setParallelScale(parallelScale);
+      cam.setViewAngle(viewAngle);
+      entry.requestRender();
+    }
+  } finally {
+    isCameraSyncing = false;
+  }
+}
+
+
+// ============================================================================
 // View Components
 // ============================================================================
 
@@ -181,6 +284,7 @@ interface VtkViewProps {
   autoResetCamera?: boolean;
   interactorSettings?: ManipulatorSettings[];
   autoCenterOfRotation?: boolean;
+  syncGroup?: string;
   style?: React.CSSProperties;
   renderWindowStyle?: React.CSSProperties;
   className?: string;
@@ -196,12 +300,85 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     autoResetCamera,
     interactorSettings,
     autoCenterOfRotation,
+    syncGroup,
     style,
     renderWindowStyle,
     className,
     children,
     'data-refast-id': dataRefastId,
   } = props;
+
+  // Internal ref to access the react-vtk-js View API (getCamera, requestRender, etc.)
+  const internalViewRef = useRef<any>(null);
+
+  // Merge the external forwarded ref with our internal ref
+  const mergeRefs = useCallback(
+    (instance: any) => {
+      internalViewRef.current = instance;
+      if (typeof ref === 'function') {
+        ref(instance);
+      } else if (ref) {
+        (ref as React.MutableRefObject<any>).current = instance;
+      }
+    },
+    [ref],
+  );
+
+  // Camera sync effect
+  useEffect(() => {
+    if (!syncGroup) return;
+
+    let cancelled = false;
+    let cleanupFn: (() => void) | null = null;
+
+    // Retry until the VTK camera is available (renderer may still be mounting)
+    function setup() {
+      if (cancelled) return;
+      const view = internalViewRef.current;
+      if (!view || !view.getCamera) {
+        setTimeout(setup, 50);
+        return;
+      }
+      const camera = view.getCamera();
+      if (!camera) {
+        setTimeout(setup, 50);
+        return;
+      }
+
+      const viewId =
+        dataRefastId || `vtk-sync-${Math.random().toString(36).slice(2)}`;
+
+      const entry: CameraSyncEntry = {
+        viewId,
+        getCamera: () => internalViewRef.current?.getCamera?.(),
+        // Use getRenderWindow().requestRender() to bypass the Renderer's
+        // requestRender path which triggers autoResetCamera. That would
+        // undo panned/zoomed camera state by resetting to fit the scene.
+        requestRender: () =>
+          internalViewRef.current?.getRenderWindow?.()?.requestRender?.(),
+      };
+
+      const unregister = registerCameraSync(syncGroup, entry);
+
+      const subscription = camera.onModified(() => {
+        if (!isCameraSyncing) {
+          broadcastCameraState(syncGroup, viewId, camera);
+        }
+      });
+
+      cleanupFn = () => {
+        unregister();
+        subscription.unsubscribe();
+      };
+    }
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      cleanupFn?.();
+    };
+  }, [syncGroup, dataRefastId]);
 
   return (
     <div
@@ -210,7 +387,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
       style={{ position: 'relative', ...style }}
     >
       <View
-        ref={ref}
+        ref={mergeRefs}
         background={background}
         interactive={interactive}
         camera={camera}
@@ -247,9 +424,9 @@ export const VtkMultiViewRoot = forwardRef<unknown, VtkMultiViewRootProps>((prop
   } = props;
 
   return (
-    <div id={dataRefastId} className={className} style={style}>
+    <div id={dataRefastId} className={className}>
       <MultiViewRoot
-        style={{ width: '100%', height: '100%' }}
+        style={style}
         renderWindowStyle={renderWindowStyle}
       >
         {children}

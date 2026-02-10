@@ -23,7 +23,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "refast>=0.1.0",
+    "refast>=0.0.1",
 ]
 
 [project.urls]

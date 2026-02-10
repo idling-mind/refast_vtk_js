@@ -28,6 +28,10 @@ class View(Component):
         auto_reset_camera: Whether to auto-reset camera on data changes (default: True)
         interactor_settings: List of mouse interaction settings
         auto_center_of_rotation: Whether to auto-center rotation (default: True)
+        sync_group: Sync group name for camera synchronization. Views inside a
+            MultiViewRoot that share the same sync_group will have their cameras
+            linked so that rotating, panning, or zooming one view updates all
+            others in the group.
         style: CSS style properties for the container
         id: Component ID
         class_name: CSS classes
@@ -63,6 +67,7 @@ class View(Component):
         auto_reset_camera: bool = True,
         interactor_settings: list[dict[str, Any]] | None = None,
         auto_center_of_rotation: bool = True,
+        sync_group: str | None = None,
         style: dict[str, Any] | None = None,
         render_window_style: dict[str, Any] | None = None,
         children: list["Component | str"] | None = None,
@@ -77,6 +82,7 @@ class View(Component):
         self.auto_reset_camera = auto_reset_camera
         self.interactor_settings = interactor_settings
         self.auto_center_of_rotation = auto_center_of_rotation
+        self.sync_group = sync_group
         self.style = style
         self.render_window_style = render_window_style
         if children:
@@ -93,6 +99,7 @@ class View(Component):
                 "auto_reset_camera": self.auto_reset_camera,
                 "interactor_settings": self.interactor_settings,
                 "auto_center_of_rotation": self.auto_center_of_rotation,
+                "sync_group": self.sync_group,
                 "style": self.style,
                 "render_window_style": self.render_window_style,
                 "class_name": self.class_name,
