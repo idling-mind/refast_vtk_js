@@ -150,7 +150,7 @@ View(
 from refast_vtk_js import View, GeometryRepresentation, PolyData, Picking
 
 async def handle_click(ctx):
-    selection = ctx.event.data.get("selection", {})
+    selection = ctx.event_data.get("selection", {})
     world_pos = selection.get("worldPosition")
     print(f"Clicked at world position: {world_pos}")
 

@@ -7,14 +7,14 @@ refast_vtk_js extension.
 Run with: python examples/point_cloud.py
 Then open: http://localhost:8000
 """
+
 import asyncio
 import math
-import colorsys
 import random
 from fastapi import FastAPI
 
 from refast import Context, RefastApp
-from refast.components import Container, Heading, Text, Button
+from refast.components import Container, Heading, Text, Button, Input
 from refast_vtk_js import (
     DataArray,
     GeometryRepresentation,
@@ -28,13 +28,15 @@ ui = RefastApp(
     title="VTK.js Point Cloud",
 )
 
-async def add_data(ctx: Context):
+
+async def add_data(ctx: Context, offset_value: float = 0.0):
     """Callback to add more points following the spiral pattern and matching colors."""
     # Add 100 points that follow the same spiral style used initially
+    offset_value = float(offset_value) if offset_value else 0.0
     for i in range(100):
         theta = random.uniform(0, 8 * math.pi)
         radius = 1
-        x = math.cos(theta) * radius + random.uniform(-0.05, 0.05)
+        x = math.cos(theta) * radius + random.uniform(-0.05, 0.05) + offset_value
         y = math.sin(theta) * radius + random.uniform(-0.05, 0.05)
         z = random.uniform(-1, 1)
         await ctx.append_prop("point-cloud-polydata", "points", [x, y, z])
@@ -57,11 +59,22 @@ def home(ctx: Context):
             Heading("VTK.js 3D Point Cloud", level=1, class_name="mb-4"),
             Text(
                 "This example shows a colorful cylindrical point cloud."
-                " Click the button to stream more points that follow the same cylindrical pattern," 
+                " Click the button to stream more points that follow the same cylindrical pattern,"
                 " each added point will carry a matching rainbow color.",
                 class_name="mb-4 text-muted-foreground",
             ),
-            Button("Stream data", class_name="w-full my-4", on_click=ctx.callback(add_data)),
+            Input(
+                name="offset",
+                type="number",
+                placeholder="Offset for new points (default 0)",
+                class_name="mb-4",
+                on_change=ctx.callback(store_as="offset_value"),
+            ),
+            Button(
+                "Stream data",
+                class_name="w-full my-4",
+                on_click=ctx.callback(add_data, props=["offset_value"]),
+            ),
             View(
                 background=[0.1, 0.15, 0.2],
                 style={"width": "100%", "height": "500px"},
