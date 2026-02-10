@@ -308,6 +308,9 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     'data-refast-id': dataRefastId,
   } = props;
 
+  // Ref for the outer wrapper div (used by ResizeObserver)
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Internal ref to access the react-vtk-js View API (getCamera, requestRender, etc.)
   const internalViewRef = useRef<any>(null);
 
@@ -323,6 +326,98 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     },
     [ref],
   );
+
+  // Ensure the VTK canvas fills its container and stays crisp on resize.
+  //
+  // Two things are needed:
+  //
+  // 1. **Canvas CSS `height: 100%`** — vtk.js creates the <canvas> with only
+  //    `style.width = '100%'`; without an explicit CSS height the canvas
+  //    relies on its intrinsic aspect-ratio, which leaves whitespace when
+  //    the container's aspect-ratio differs from the buffer's.
+  //
+  // 2. **Pixel-buffer update + synchronous render on resize** — when the
+  //    container changes size the canvas buffer (width/height attributes)
+  //    must be updated to match.  Crucially, we call `renderWindow.render()`
+  //    **synchronously** right after `setSize()`, mirroring what vtk.js's
+  //    own `FullScreenRenderWindow.resize()` does.  This ensures the canvas
+  //    is cleared *and* re-painted within the same frame — the browser
+  //    never paints the blank/cleared buffer, so there is no flicker.
+  //
+  //    react-vtk-js's built-in ResizeObserver uses deferred rendering
+  //    (`queueRender`), which leaves a 1-frame gap between the buffer
+  //    clear and the repaint.  Our observer fires in the same delivery
+  //    batch; because `setSize` is guarded (same dimensions → no-op),
+  //    the library's subsequent call does nothing.
+  useEffect(() => {
+    const wrapper = containerRef.current;
+    if (!wrapper) return;
+
+    let mutationObs: MutationObserver | null = null;
+
+    // --- Canvas CSS patch ------------------------------------------------
+    function patchCanvas() {
+      const canvas = wrapper.querySelector('canvas');
+      if (canvas && !canvas.style.height) {
+        canvas.style.height = '100%';
+      }
+      return !!canvas;
+    }
+
+    if (!patchCanvas()) {
+      mutationObs = new MutationObserver(() => {
+        if (patchCanvas()) {
+          mutationObs?.disconnect();
+          mutationObs = null;
+        }
+      });
+      mutationObs.observe(wrapper, { childList: true, subtree: true });
+    }
+
+    // --- Pixel-buffer resize observer ------------------------------------
+    function updateBufferSize() {
+      const view = internalViewRef.current;
+      if (!view) return;
+
+      const oglrwCtx = view.getOpenGLRenderWindow?.();
+      if (!oglrwCtx) return;
+
+      const vtkGLRW = oglrwCtx.get?.();
+      const rwContainer = oglrwCtx.getContainer?.();
+      if (!vtkGLRW || !rwContainer) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const { width, height } = rwContainer.getBoundingClientRect();
+      const w = Math.max(Math.floor(width * dpr), 10);
+      const h = Math.max(Math.floor(height * dpr), 10);
+
+      // setSize is a no-op when dimensions haven't changed (vtk.js guard),
+      // so a duplicate call from the library's own observer won't flicker.
+      const modified = vtkGLRW.setSize(w, h);
+
+      if (modified) {
+        // Synchronous render — fills the cleared buffer in the same frame
+        // so the browser never paints a blank canvas.  This is the same
+        // pattern vtk.js uses in FullScreenRenderWindow.resize().
+        const rwCtx = view.getRenderWindow?.();
+        const rawRW = rwCtx?.get?.();
+        if (rawRW?.render) {
+          rawRW.render();
+        } else {
+          // Fallback: deferred render (may flash, but better than nothing)
+          view.requestRender?.();
+        }
+      }
+    }
+
+    const resizeObs = new ResizeObserver(updateBufferSize);
+    resizeObs.observe(wrapper);
+
+    return () => {
+      mutationObs?.disconnect();
+      resizeObs.disconnect();
+    };
+  }, []);
 
   // Camera sync effect
   useEffect(() => {
@@ -382,9 +477,10 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
 
   return (
     <div
+      ref={containerRef}
       id={dataRefastId}
       className={className}
-      style={{ position: 'relative', ...style }}
+      style={{ position: 'relative', width: '100%', height: '100%', ...style }}
     >
       <View
         ref={mergeRefs}
