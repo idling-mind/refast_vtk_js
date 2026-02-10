@@ -26,7 +26,23 @@ class View(Component):
         interactive: Whether the view is interactive (default: True)
         camera: Camera properties (position, focal_point, view_up, etc.)
         auto_reset_camera: Whether to auto-reset camera on data changes (default: True)
-        interactor_settings: List of mouse interaction settings
+        interactor_settings: List of mouse/scroll interaction settings. Each setting
+            is a dict with keys:
+            - 'button': Mouse button (1=left, 2=middle, 3=right)
+            - 'action': Interaction type ('Rotate', 'Pan', 'Zoom', 'Roll', 'Select')
+            - 'scrollEnabled': Enable scroll wheel (default: False)
+            - 'dragEnabled': Enable drag action (default: True)
+            - 'zoomToMouse': Zoom toward cursor position (default: False)
+            Default enables left-click rotate, middle-click pan, and scroll-to-zoom
+            with zoomToMouse enabled. Example custom settings:
+            ```python
+            [
+                {"button": 1, "action": "Rotate"},
+                {"button": 2, "action": "Pan"},
+                {"button": 3, "action": "Zoom", "dragEnabled": True},
+                {"button": 3, "scrollEnabled": True, "zoomToMouse": True}
+            ]
+            ```
         auto_center_of_rotation: Whether to auto-center rotation (default: True)
         sync_group: Sync group name for camera synchronization. Views inside a
             MultiViewRoot that share the same sync_group will have their cameras
@@ -80,7 +96,12 @@ class View(Component):
         self.interactive = interactive
         self.camera = camera
         self.auto_reset_camera = auto_reset_camera
-        self.interactor_settings = interactor_settings
+        # Default interactor settings with zoomToMouse enabled
+        self.interactor_settings = interactor_settings if interactor_settings is not None else [
+            {"button": 1, "action": "Rotate"},
+            {"button": 2, "action": "Pan"},
+            {"button": 3, "action": "ZoomToMouse", "scrollEnabled": True},
+        ]
         self.auto_center_of_rotation = auto_center_of_rotation
         self.sync_group = sync_group
         self.style = style
