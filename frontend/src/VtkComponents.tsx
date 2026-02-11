@@ -391,22 +391,33 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
       const w = Math.max(Math.floor(width * dpr), 10);
       const h = Math.max(Math.floor(height * dpr), 10);
 
-      // setSize is a no-op when dimensions haven't changed (vtk.js guard),
-      // so a duplicate call from the library's own observer won't flicker.
-      const modified = vtkGLRW.setSize(w, h);
+      // Apply the new pixel-buffer size.  setSize is a no-op when the
+      // dimensions haven't changed, but we always follow up with a
+      // synchronous render regardless of the return value.
+      //
+      // Why not gate on `modified`?
+      // When views share a camera-sync group, broadcastCameraState() calls
+      // requestRender() on peer views.  That deferred render can internally
+      // call setSize(), consuming the pending size change *before* our
+      // ResizeObserver callback fires.  setSize then returns false here,
+      // the synchronous render is skipped, and the browser paints the
+      // cleared (blank) buffer — causing flicker.
+      //
+      // Always rendering synchronously is cheap because this callback only
+      // fires on actual container size changes (ResizeObserver guarantee),
+      // and vtk.js's render pipeline skips redundant GPU work internally.
+      vtkGLRW.setSize(w, h);
 
-      if (modified) {
-        // Synchronous render — fills the cleared buffer in the same frame
-        // so the browser never paints a blank canvas.  This is the same
-        // pattern vtk.js uses in FullScreenRenderWindow.resize().
-        const rwCtx = view.getRenderWindow?.();
-        const rawRW = rwCtx?.get?.();
-        if (rawRW?.render) {
-          rawRW.render();
-        } else {
-          // Fallback: deferred render (may flash, but better than nothing)
-          view.requestRender?.();
-        }
+      // Synchronous render — fills the buffer in the same frame so the
+      // browser never paints a blank canvas.  Same pattern vtk.js uses
+      // in FullScreenRenderWindow.resize().
+      const rwCtx = view.getRenderWindow?.();
+      const rawRW = rwCtx?.get?.();
+      if (rawRW?.render) {
+        rawRW.render();
+      } else {
+        // Fallback: deferred render (may flash, but better than nothing)
+        view.requestRender?.();
       }
     }
 
@@ -421,6 +432,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
 
   // Camera sync effect
   useEffect(() => {
+    console.log(`[VTK] Setting up camera sync for group "${syncGroup}" (View ID: ${dataRefastId})`);
     if (!syncGroup) return;
 
     let cancelled = false;
