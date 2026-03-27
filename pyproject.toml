@@ -38,6 +38,9 @@ refast_vtk_js = "refast_vtk_js:VtkExtension"
 [tool.hatch.build.targets.wheel]
 packages = ["src/refast_vtk_js"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/refast_vtk_js/static" = "refast_vtk_js/static"
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/",
