@@ -487,6 +487,36 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     };
   }, [syncGroup, dataRefastId]);
 
+  // Expose imperative methods on the wrapper DOM element so Python can call
+  // them with ctx.bound_js(...) / ctx.call_bound_js(...).
+  useEffect(() => {
+    const wrapper = containerRef.current;
+    if (!wrapper) return;
+
+    const resetCamera = () => {
+      const view = internalViewRef.current;
+      if (!view) return;
+      view.resetCamera?.();
+      view.requestRender?.();
+    };
+
+    const requestRender = () => {
+      internalViewRef.current?.requestRender?.();
+    };
+
+    (wrapper as any).resetCamera = resetCamera;
+    (wrapper as any).reset_camera = resetCamera;
+    (wrapper as any).requestRender = requestRender;
+    (wrapper as any).request_render = requestRender;
+
+    return () => {
+      delete (wrapper as any).resetCamera;
+      delete (wrapper as any).reset_camera;
+      delete (wrapper as any).requestRender;
+      delete (wrapper as any).request_render;
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
