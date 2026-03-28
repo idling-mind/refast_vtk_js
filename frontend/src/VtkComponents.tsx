@@ -13,6 +13,8 @@ import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Geometry';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Glyph';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Volume';
+import vtkCubeAxesActor from '@kitware/vtk.js/Rendering/Core/CubeAxesActor';
+import vtkScalarBarActor from '@kitware/vtk.js/Rendering/Core/ScalarBarActor';
 
 // Import VTK.js sources/filters (needed for Algorithm component to find them by string name)
 // These imports register the classes with vtk.js factory, enabling vtkClass="vtkConeSource" etc.
@@ -91,6 +93,14 @@ import {
   RegisterDataSet,
   UseDataSet,
 } from 'react-vtk-js';
+
+// react-vtk-js v2 currently declares scalar bar / cube axes props in types,
+// but its GeometryRepresentation runtime does not apply them.
+// Use internal contexts to attach those actors explicitly.
+import {
+  useRendererContext,
+  useRepresentationContext,
+} from 'react-vtk-js/dist/esm/core/contexts';
 
 import type {
   PickResult,
@@ -350,14 +360,14 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
   //    batch; because `setSize` is guarded (same dimensions → no-op),
   //    the library's subsequent call does nothing.
   useEffect(() => {
-    const wrapper = containerRef.current;
-    if (!wrapper) return;
+    const wrapperEl = containerRef.current;
+    if (!wrapperEl) return;
 
     let mutationObs: MutationObserver | null = null;
 
     // --- Canvas CSS patch ------------------------------------------------
     function patchCanvas() {
-      const canvas = wrapper.querySelector('canvas');
+      const canvas = wrapperEl!.querySelector('canvas');
       if (canvas && !canvas.style.height) {
         canvas.style.height = '100%';
       }
@@ -371,7 +381,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
           mutationObs = null;
         }
       });
-      mutationObs.observe(wrapper, { childList: true, subtree: true });
+      mutationObs.observe(wrapperEl, { childList: true, subtree: true });
     }
 
     // --- Pixel-buffer resize observer ------------------------------------
@@ -422,7 +432,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     }
 
     const resizeObs = new ResizeObserver(updateBufferSize);
-    resizeObs.observe(wrapper);
+    resizeObs.observe(wrapperEl);
 
     return () => {
       mutationObs?.disconnect();
@@ -434,6 +444,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
   useEffect(() => {
     console.log(`[VTK] Setting up camera sync for group "${syncGroup}" (View ID: ${dataRefastId})`);
     if (!syncGroup) return;
+    const syncGroupName = syncGroup;
 
     let cancelled = false;
     let cleanupFn: (() => void) | null = null;
@@ -465,11 +476,11 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
           internalViewRef.current?.getRenderWindow?.()?.requestRender?.(),
       };
 
-      const unregister = registerCameraSync(syncGroup, entry);
+      const unregister = registerCameraSync(syncGroupName, entry);
 
       const subscription = camera.onModified(() => {
         if (!isCameraSyncing) {
-          broadcastCameraState(syncGroup, viewId, camera);
+          broadcastCameraState(syncGroupName, viewId, camera);
         }
       });
 
@@ -590,12 +601,155 @@ interface VtkGeometryRepresentationProps {
   showCubeAxes?: boolean;
   cubeAxesStyle?: Record<string, unknown>;
   showScalarBar?: boolean;
-  scalarBarTitle?: boolean;
+  scalarBarTitle?: boolean | string;
   scalarBarStyle?: Record<string, unknown>;
   onDataAvailable?: CallbackProp;
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+}
+
+interface GeometryDecorationProps {
+  showCubeAxes?: boolean;
+  cubeAxesStyle?: Record<string, unknown>;
+  showScalarBar?: boolean;
+  scalarBarTitle?: boolean | string;
+  scalarBarStyle?: Record<string, unknown>;
+}
+
+function toBounds6(input: unknown): [number, number, number, number, number, number] | null {
+  if (!Array.isArray(input) || input.length !== 6) {
+    return null;
+  }
+
+  const values = input.map((v) => Number(v));
+  if (values.some((v) => Number.isNaN(v) || !Number.isFinite(v))) {
+    return null;
+  }
+
+  return [
+    values[0],
+    values[1],
+    values[2],
+    values[3],
+    values[4],
+    values[5],
+  ];
+}
+
+function GeometryDecorationActors({
+  showCubeAxes,
+  cubeAxesStyle,
+  showScalarBar,
+  scalarBarTitle,
+  scalarBarStyle,
+}: GeometryDecorationProps): null {
+  const renderer = useRendererContext();
+  const representation = useRepresentationContext();
+  const cubeAxesRef = useRef<any>(null);
+  const scalarBarRef = useRef<any>(null);
+
+  const syncActors = useCallback(() => {
+    const vtkRenderer = renderer.get?.();
+    const vtkMapper = representation.getMapper?.() as any;
+    const vtkActor = representation.getActor?.() as any;
+
+    if (!vtkRenderer) {
+      return;
+    }
+
+    if (showCubeAxes) {
+      if (!cubeAxesRef.current) {
+        cubeAxesRef.current = vtkCubeAxesActor.newInstance();
+        vtkRenderer.addActor(cubeAxesRef.current);
+      }
+
+      const cubeAxes = cubeAxesRef.current;
+      const bounds = toBounds6(vtkMapper?.getBounds?.() ?? vtkActor?.getBounds?.());
+      const camera = vtkRenderer.getActiveCamera?.();
+
+      if (bounds) {
+        cubeAxes.setDataBounds(bounds);
+      }
+      if (camera) {
+        cubeAxes.setCamera(camera);
+      }
+      if (cubeAxesStyle && typeof cubeAxes.set === 'function') {
+        cubeAxes.set(cubeAxesStyle);
+      }
+    } else if (cubeAxesRef.current) {
+      vtkRenderer.removeActor(cubeAxesRef.current);
+      cubeAxesRef.current.delete?.();
+      cubeAxesRef.current = null;
+    }
+
+    if (showScalarBar) {
+      if (!scalarBarRef.current) {
+        scalarBarRef.current = vtkScalarBarActor.newInstance();
+        vtkRenderer.addActor(scalarBarRef.current);
+      }
+
+      const scalarBar = scalarBarRef.current;
+      const lookupTable = vtkMapper?.getLookupTable?.();
+      if (lookupTable) {
+        scalarBar.setScalarsToColors(lookupTable);
+      }
+
+      if (typeof scalarBarTitle === 'string') {
+        scalarBar.setAxisLabel(scalarBarTitle);
+      } else if (scalarBarTitle === false) {
+        scalarBar.setAxisLabel('');
+      }
+
+      if (scalarBarStyle && typeof scalarBar.set === 'function') {
+        scalarBar.set(scalarBarStyle);
+      }
+    } else if (scalarBarRef.current) {
+      vtkRenderer.removeActor(scalarBarRef.current);
+      scalarBarRef.current.delete?.();
+      scalarBarRef.current = null;
+    }
+
+    renderer.requestRender();
+  }, [
+    renderer,
+    representation,
+    showCubeAxes,
+    cubeAxesStyle,
+    showScalarBar,
+    scalarBarTitle,
+    scalarBarStyle,
+  ]);
+
+  useEffect(() => {
+    syncActors();
+
+    const unsubscribeAvailable = representation.onDataAvailable?.(() => {
+      syncActors();
+    });
+    const unsubscribeChanged = representation.onDataChanged?.(() => {
+      syncActors();
+    });
+
+    return () => {
+      unsubscribeAvailable?.();
+      unsubscribeChanged?.();
+
+      const vtkRenderer = renderer.get?.();
+      if (vtkRenderer && cubeAxesRef.current) {
+        vtkRenderer.removeActor(cubeAxesRef.current);
+        cubeAxesRef.current.delete?.();
+        cubeAxesRef.current = null;
+      }
+      if (vtkRenderer && scalarBarRef.current) {
+        vtkRenderer.removeActor(scalarBarRef.current);
+        scalarBarRef.current.delete?.();
+        scalarBarRef.current = null;
+      }
+    };
+  }, [renderer, representation, syncActors]);
+
+  return null;
 }
 
 export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresentationProps>(
@@ -624,22 +778,46 @@ export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresen
     // Validate color map preset to prevent "Cannot read properties of undefined" error
     const validColorMapPreset = colorMapPreset ? getValidColorMapPreset(colorMapPreset) : undefined;
 
+    // Scalar bar visibility depends on scalar-aware mapper settings.
+    // Apply safe defaults when scalar bar is enabled but mapper options are omitted.
+    const resolvedMapper = showScalarBar
+      ? {
+          scalarVisibility: true,
+          interpolateScalarsBeforeMapping: true,
+          useLookupTableScalarRange: true,
+          ...(mapper || {}),
+        }
+      : mapper;
+
     return (
       <GeometryRepresentation
         ref={ref}
         id={id || dataRefastId}
         actor={actor}
-        mapper={mapper}
+        mapper={resolvedMapper}
         property={property}
         colorMapPreset={validColorMapPreset}
         colorDataRange={colorDataRange}
         showCubeAxes={showCubeAxes}
         cubeAxesStyle={cubeAxesStyle}
         showScalarBar={showScalarBar}
-        scalarBarTitle={scalarBarTitle}
+        scalarBarTitle={
+          typeof scalarBarTitle === 'boolean'
+            ? scalarBarTitle
+            : scalarBarTitle
+              ? true
+              : undefined
+        }
         scalarBarStyle={scalarBarStyle}
         onDataAvailable={onDataAvailable ? handleDataAvailable : undefined}
       >
+        <GeometryDecorationActors
+          showCubeAxes={showCubeAxes}
+          cubeAxesStyle={cubeAxesStyle}
+          showScalarBar={showScalarBar}
+          scalarBarTitle={scalarBarTitle}
+          scalarBarStyle={scalarBarStyle}
+        />
         {children}
       </GeometryRepresentation>
     );

@@ -36,6 +36,7 @@ from refast_vtk_js import (
 
 ui = RefastApp(
     title="VTK.js Synced Views",
+    # preloaded_extensions=["refast_vtk_js"],
 )
 
 

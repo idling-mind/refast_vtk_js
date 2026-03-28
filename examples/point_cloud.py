@@ -68,15 +68,22 @@ def home(ctx: Context):
                 type="number",
                 placeholder="Offset for new points (default 0)",
                 class_name="mb-4",
-                on_change=ctx.callback(store_as="offset_value"),
+                on_change=ctx.save_prop("offset_value"),
             ),
             Button(
                 "Stream data",
                 class_name="w-full my-4",
                 on_click=ctx.callback(add_data, props=["offset_value"]),
             ),
+            Button(
+                "Reset camera",
+                class_name="w-full mb-4",
+                on_click=ctx.bound_js("point-cloud-view", "resetCamera"),
+            ),
             View(
+                id="point-cloud-view",
                 background=[0.1, 0.15, 0.2],
+                auto_reset_camera=False,
                 style={"width": "100%", "height": "500px"},
                 children=[
                     GeometryRepresentation(
