@@ -197,6 +197,7 @@ class AxesActor(Component):
 
     Args:
         visible: Whether the actor is visible (default: True)
+        size: Uniform scale (float) or per-axis scale [sx, sy, sz]
         config: Global axes actor config object
         x_config: X axis-specific config (e.g. invert)
         y_config: Y axis-specific config (e.g. invert)
@@ -210,10 +211,10 @@ class AxesActor(Component):
         marker_viewport_size: Relative marker size in viewport (0-1)
         marker_min_pixel_size: Minimum marker size in pixels
         marker_max_pixel_size: Maximum marker size in pixels
-        axis_labels_enabled: Use annotated cube marker with axis labels
-        axis_labels: Label mapping for cube faces with keys:
-            'x_plus', 'x_minus', 'y_plus', 'y_minus', 'z_plus', 'z_minus'
-        axis_label_style: Style override for annotated cube text/faces
+        axis_labels_enabled: Show text labels beside axis arrow tips
+        axis_labels: Label mapping; supports keys 'x', 'y', 'z' and
+            falls back to 'x_plus', 'y_plus', 'z_plus'
+        axis_label_style: Style override for label text
         id: Component ID
         class_name: CSS classes
 
@@ -254,6 +255,7 @@ class AxesActor(Component):
     def __init__(
         self,
         visible: bool = True,
+        size: float | list[float] | None = None,
         config: dict[str, Any] | None = None,
         x_config: dict[str, Any] | None = None,
         y_config: dict[str, Any] | None = None,
@@ -276,6 +278,7 @@ class AxesActor(Component):
     ):
         super().__init__(id=id, class_name=class_name, **props)
         self.visible = visible
+        self.size = size
         self.config = config
         self.x_config = x_config
         self.y_config = y_config
@@ -299,6 +302,7 @@ class AxesActor(Component):
             "id": self.id,
             "props": {
                 "visible": self.visible,
+                "size": self.size,
                 "config": self.config,
                 "x_config": self.x_config,
                 "y_config": self.y_config,

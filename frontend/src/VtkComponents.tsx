@@ -559,6 +559,7 @@ VtkView.displayName = 'VtkView';
 
 interface VtkAxesActorProps {
   visible?: boolean;
+  size?: number | [number, number, number];
   config?: Record<string, unknown>;
   xConfig?: Record<string, unknown>;
   yConfig?: Record<string, unknown>;
@@ -582,6 +583,7 @@ interface VtkAxesActorProps {
 export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
   const {
     visible = true,
+    size,
     config,
     xConfig,
     yConfig,
@@ -646,6 +648,12 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
         axesActor.setVisibility(!!visible);
       }
 
+      if (typeof size === 'number' && typeof axesActor.setScale === 'function') {
+        axesActor.setScale(size, size, size);
+      } else if (Array.isArray(size) && size.length === 3 && typeof axesActor.setScale === 'function') {
+        axesActor.setScale(size[0], size[1], size[2]);
+      }
+
       if (config && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
         axesActor.setConfig({ ...axesActor.getConfig(), ...config });
       }
@@ -684,6 +692,7 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
     },
     [
       visible,
+      size,
       config,
       xConfig,
       yConfig,
@@ -705,19 +714,147 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
     cleanupMarkerWidget();
     cleanupLabelOverlay();
 
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+
+    const attachTextLabels = (
+      targetRenderer: any,
+      targetActor: any,
+      mode: 'fixed' | 'world'
+    ) => {
+      if (!interactor) {
+        return;
+      }
+
+      const container = interactor.getContainer?.();
+      const view = interactor.getView?.();
+      if (!targetRenderer || !container || !view) {
+        return;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.style.position = 'absolute';
+      overlay.style.left = '0';
+      overlay.style.top = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.pointerEvents = 'none';
+      overlay.style.zIndex = '2';
+
+      const makeLabel = (text: string) => {
+        const el = document.createElement('div');
+        const css = axisLabelStyle || {};
+        const color = String(css.color ?? css.fontColor ?? css.font_color ?? '#ffffff');
+        const fontSize = String(css.fontSize ?? css.font_size ?? '13px');
+        const fontWeight = String(css.fontWeight ?? css.font_weight ?? 700);
+
+        el.textContent = text;
+        el.style.position = 'absolute';
+        el.style.color = color;
+        el.style.fontSize = fontSize;
+        el.style.fontWeight = fontWeight;
+        el.style.textShadow = '0 1px 2px rgba(0,0,0,0.65)';
+        el.style.transform = 'translate(-50%, -50%)';
+        overlay.appendChild(el);
+        return el;
+      };
+
+      const labels = axisLabels || {};
+      const xLabel = makeLabel(String(labels.x ?? labels.x_label ?? labels.xPlus ?? labels.x_plus ?? 'X'));
+      const yLabel = makeLabel(String(labels.y ?? labels.y_label ?? labels.yPlus ?? labels.y_plus ?? 'Y'));
+      const zLabel = makeLabel(String(labels.z ?? labels.z_label ?? labels.zPlus ?? labels.z_plus ?? 'Z'));
+
+      labelsOverlayRef.current = overlay;
+      container.appendChild(overlay);
+
+      const getTipCoordinates = (): Record<'x' | 'y' | 'z', [number, number, number]> => {
+        const cfg = (config || {}) as Record<string, unknown>;
+        const centered = typeof recenter === 'boolean' ? recenter : (cfg.recenter as boolean | undefined) ?? true;
+        const baseTip = centered ? 0.56 : 1.06;
+
+        let sx = 1;
+        let sy = 1;
+        let sz = 1;
+        if (typeof size === 'number') {
+          sx = size;
+          sy = size;
+          sz = size;
+        } else if (Array.isArray(size) && size.length === 3) {
+          sx = Number(size[0]) || 1;
+          sy = Number(size[1]) || 1;
+          sz = Number(size[2]) || 1;
+        }
+
+        const xInv = typeof xAxisInvert === 'boolean' ? xAxisInvert : (xConfig?.invert as boolean | undefined) ?? false;
+        const yInv = typeof yAxisInvert === 'boolean' ? yAxisInvert : (yConfig?.invert as boolean | undefined) ?? false;
+        const zInv = typeof zAxisInvert === 'boolean' ? zAxisInvert : (zConfig?.invert as boolean | undefined) ?? false;
+
+        const actorPos = mode === 'world' ? (targetActor.getPosition?.() ?? [0, 0, 0]) : [0, 0, 0];
+
+        return {
+          x: [actorPos[0] + (xInv ? -baseTip : baseTip) * sx, actorPos[1], actorPos[2]],
+          y: [actorPos[0], actorPos[1] + (yInv ? -baseTip : baseTip) * sy, actorPos[2]],
+          z: [actorPos[0], actorPos[1], actorPos[2] + (zInv ? -baseTip : baseTip) * sz],
+        };
+      };
+
+      const updateOverlayPositions = () => {
+        const canvas = view.getCanvas?.();
+        if (!canvas) {
+          return;
+        }
+
+        const canvasHeight = canvas.height;
+        const tips = getTipCoordinates();
+
+        const positionLabel = (el: HTMLDivElement, point: [number, number, number], dx: number, dy: number) => {
+          const display = view.worldToDisplay(point[0], point[1], point[2], targetRenderer);
+          const x = display[0] + dx;
+          const y = canvasHeight - display[1] + dy;
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+        };
+
+        positionLabel(xLabel, tips.x, 10, 0);
+        positionLabel(yLabel, tips.y, 0, -10);
+        positionLabel(zLabel, tips.z, 8, 8);
+      };
+
+      updateOverlayPositions();
+
+      const camera = vtkRenderer.getActiveCamera?.();
+      if (camera?.onModified) {
+        labelSubscriptionsRef.current.push(camera.onModified(updateOverlayPositions));
+      }
+      if (interactor.onAnimation) {
+        labelSubscriptionsRef.current.push(interactor.onAnimation(updateOverlayPositions));
+      }
+      if (interactor.onEndAnimation) {
+        labelSubscriptionsRef.current.push(interactor.onEndAnimation(updateOverlayPositions));
+      }
+
+      labelResizeObserverRef.current = new ResizeObserver(() => {
+        updateOverlayPositions();
+      });
+      labelResizeObserverRef.current.observe(container);
+    };
+
     if (!fixedInWindow) {
       axesActorRef.current = vtkAxesActor.newInstance();
       vtkRenderer.addActor(axesActorRef.current);
       applyAxesConfig(axesActorRef.current);
+
+      if (axisLabelsEnabled) {
+        attachTextLabels(vtkRenderer, axesActorRef.current, 'world');
+      }
+
       renderer.requestRender();
 
       return () => {
         cleanupWorldActor();
+        cleanupLabelOverlay();
         renderer.requestRender();
       };
     }
-
-    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
     if (!interactor) {
       return;
     }
@@ -744,100 +881,8 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
 
     if (axisLabelsEnabled) {
       const markerRenderer = markerWidgetRef.current.getRenderer?.();
-      const container = interactor.getContainer?.();
-      const view = interactor.getView?.();
-
-      if (markerRenderer && container && view) {
-        const overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.left = '0';
-        overlay.style.top = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '2';
-
-        const makeLabel = (text: string) => {
-          const el = document.createElement('div');
-          const css = axisLabelStyle || {};
-          const color = String(css.color ?? css.fontColor ?? '#ffffff');
-          const fontSize = String(css.fontSize ?? css.font_size ?? '13px');
-          const fontWeight = String(css.fontWeight ?? css.font_weight ?? 700);
-
-          el.textContent = text;
-          el.style.position = 'absolute';
-          el.style.color = color;
-          el.style.fontSize = fontSize;
-          el.style.fontWeight = fontWeight;
-          el.style.textShadow = '0 1px 2px rgba(0,0,0,0.65)';
-          el.style.transform = 'translate(-50%, -50%)';
-          overlay.appendChild(el);
-          return el;
-        };
-
-        const labels = axisLabels || {};
-        const xLabel = makeLabel(String(labels.x ?? labels.x_label ?? labels.xPlus ?? labels.x_plus ?? 'X'));
-        const yLabel = makeLabel(String(labels.y ?? labels.y_label ?? labels.yPlus ?? labels.y_plus ?? 'Y'));
-        const zLabel = makeLabel(String(labels.z ?? labels.z_label ?? labels.zPlus ?? labels.z_plus ?? 'Z'));
-
-        labelsOverlayRef.current = overlay;
-        container.appendChild(overlay);
-
-        // Marker uses a recentered triad by default, so labels track near arrow tips.
-        const getTipCoordinates = (): Record<'x' | 'y' | 'z', [number, number, number]> => {
-          const cfg = (config || {}) as Record<string, unknown>;
-          const centered = typeof recenter === 'boolean' ? recenter : (cfg.recenter as boolean | undefined) ?? true;
-          const tip = centered ? 0.56 : 1.06;
-          const xInv = typeof xAxisInvert === 'boolean' ? xAxisInvert : (xConfig?.invert as boolean | undefined) ?? false;
-          const yInv = typeof yAxisInvert === 'boolean' ? yAxisInvert : (yConfig?.invert as boolean | undefined) ?? false;
-          const zInv = typeof zAxisInvert === 'boolean' ? zAxisInvert : (zConfig?.invert as boolean | undefined) ?? false;
-
-          return {
-            x: [xInv ? -tip : tip, 0, 0],
-            y: [0, yInv ? -tip : tip, 0],
-            z: [0, 0, zInv ? -tip : tip],
-          };
-        };
-
-        const updateOverlayPositions = () => {
-          const canvas = view.getCanvas?.();
-          if (!canvas) {
-            return;
-          }
-
-          const canvasHeight = canvas.height;
-          const tips = getTipCoordinates();
-
-          const positionLabel = (el: HTMLDivElement, point: [number, number, number], dx: number, dy: number) => {
-            const display = view.worldToDisplay(point[0], point[1], point[2], markerRenderer);
-            const x = display[0] + dx;
-            const y = canvasHeight - display[1] + dy;
-            el.style.left = `${x}px`;
-            el.style.top = `${y}px`;
-          };
-
-          positionLabel(xLabel, tips.x, 10, 0);
-          positionLabel(yLabel, tips.y, 0, -10);
-          positionLabel(zLabel, tips.z, 8, 8);
-        };
-
-        updateOverlayPositions();
-
-        const camera = vtkRenderer.getActiveCamera?.();
-        if (camera?.onModified) {
-          labelSubscriptionsRef.current.push(camera.onModified(updateOverlayPositions));
-        }
-        if (interactor.onAnimation) {
-          labelSubscriptionsRef.current.push(interactor.onAnimation(updateOverlayPositions));
-        }
-        if (interactor.onEndAnimation) {
-          labelSubscriptionsRef.current.push(interactor.onEndAnimation(updateOverlayPositions));
-        }
-
-        labelResizeObserverRef.current = new ResizeObserver(() => {
-          updateOverlayPositions();
-        });
-        labelResizeObserverRef.current.observe(container);
+      if (markerRenderer) {
+        attachTextLabels(markerRenderer, markerActorRef.current, 'fixed');
       }
     }
 
@@ -862,6 +907,7 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
     applyAxesConfig,
     axisLabels,
     axisLabelStyle,
+    size,
     recenter,
     xAxisInvert,
     yAxisInvert,

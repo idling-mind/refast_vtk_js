@@ -1,8 +1,9 @@
 """
 AxesActor Example
 
-Demonstrates a fixed-in-window orientation marker with axis annotation,
-alongside runtime toggles for marker mode, corner, recenter, and inversion.
+Demonstrates both world-origin (non-fixed) and fixed-in-window axes.
+Includes controls for size, text labels, corner placement, recenter,
+and per-axis inversion.
 
 Run with: python examples/axes_actor.py
 Then open: http://localhost:8000
@@ -100,6 +101,21 @@ async def set_corner_bottom_left(ctx: Context):
     await ctx.update_props("axes-actor", {"marker_corner": "BOTTOM_LEFT"})
 
 
+async def set_size_small(ctx: Context):
+    """Set smaller world-axes size."""
+    await ctx.update_props("axes-actor", {"size": 0.5})
+
+
+async def set_size_medium(ctx: Context):
+    """Set medium world-axes size."""
+    await ctx.update_props("axes-actor", {"size": 1.0})
+
+
+async def set_size_large(ctx: Context):
+    """Set larger world-axes size."""
+    await ctx.update_props("axes-actor", {"size": 1.8})
+
+
 @ui.page("/")
 def home(ctx: Context):
     """Render AxesActor demo page."""
@@ -108,12 +124,15 @@ def home(ctx: Context):
         children=[
             Heading("VTK.js AxesActor", level=1),
             Text(
-                "AxesActor supports fixed marker mode and labeled orientation annotation.",
+                "Use world mode to place axes at origin and control size, or fixed mode as a corner marker.",
                 class_name="text-muted-foreground",
             ),
             Container(
                 class_name="flex flex-wrap gap-2",
                 children=[
+                    Button("Size 0.5", on_click=ctx.callback(set_size_small)),
+                    Button("Size 1.0", on_click=ctx.callback(set_size_medium)),
+                    Button("Size 1.8", on_click=ctx.callback(set_size_large)),
                     Button("Fixed marker ON", on_click=ctx.callback(set_fixed_marker_on)),
                     Button("Fixed marker OFF", on_click=ctx.callback(set_fixed_marker_off)),
                     Button("Labels ON", on_click=ctx.callback(set_labels_on)),
@@ -136,19 +155,17 @@ def home(ctx: Context):
                 children=[
                     AxesActor(
                         id="axes-actor",
-                        fixed_in_window=True,
+                        fixed_in_window=False,
+                        size=1.0,
                         marker_corner="BOTTOM_LEFT",
                         marker_viewport_size=0.18,
                         marker_min_pixel_size=64,
                         marker_max_pixel_size=180,
                         axis_labels_enabled=True,
                         axis_labels={
-                            "x_plus": "+X",
-                            "x_minus": "-X",
-                            "y_plus": "+Y",
-                            "y_minus": "-Y",
-                            "z_plus": "+Z",
-                            "z_minus": "-Z",
+                            "x": "X",
+                            "y": "Y",
+                            "z": "Z",
                         },
                         axis_label_style={
                             "font_color": "#f8fafc",
