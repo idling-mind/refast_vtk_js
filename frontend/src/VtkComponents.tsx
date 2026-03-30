@@ -13,6 +13,7 @@ import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Geometry';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Glyph';
 import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Volume';
+import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
 import vtkCubeAxesActor from '@kitware/vtk.js/Rendering/Core/CubeAxesActor';
 import vtkScalarBarActor from '@kitware/vtk.js/Rendering/Core/ScalarBarActor';
 
@@ -553,6 +554,108 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
 });
 
 VtkView.displayName = 'VtkView';
+
+
+interface VtkAxesActorProps {
+  visible?: boolean;
+  config?: Record<string, unknown>;
+  xConfig?: Record<string, unknown>;
+  yConfig?: Record<string, unknown>;
+  zConfig?: Record<string, unknown>;
+  recenter?: boolean;
+  xAxisInvert?: boolean;
+  yAxisInvert?: boolean;
+  zAxisInvert?: boolean;
+  className?: string;
+  'data-refast-id'?: string;
+}
+
+export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
+  const {
+    visible = true,
+    config,
+    xConfig,
+    yConfig,
+    zConfig,
+    recenter,
+    xAxisInvert,
+    yAxisInvert,
+    zAxisInvert,
+  } = props;
+
+  const renderer = useRendererContext();
+  const axesActorRef = useRef<any>(null);
+
+  useEffect(() => {
+    const vtkRenderer = renderer.get?.();
+    if (!vtkRenderer) {
+      return;
+    }
+
+    if (!axesActorRef.current) {
+      axesActorRef.current = vtkAxesActor.newInstance();
+      vtkRenderer.addActor(axesActorRef.current);
+    }
+
+    const axesActor = axesActorRef.current;
+
+    if (typeof axesActor.setVisibility === 'function') {
+      axesActor.setVisibility(!!visible);
+    }
+
+    if (config && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
+      axesActor.setConfig({ ...axesActor.getConfig(), ...config });
+    }
+
+    if (typeof recenter === 'boolean' && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
+      axesActor.setConfig({ ...axesActor.getConfig(), recenter: recenter });
+    }
+
+    if (xConfig && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
+      axesActor.setXConfig({ ...axesActor.getXConfig(), ...xConfig });
+    }
+
+    if (yConfig && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
+      axesActor.setYConfig({ ...axesActor.getYConfig(), ...yConfig });
+    }
+
+    if (zConfig && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
+      axesActor.setZConfig({ ...axesActor.getZConfig(), ...zConfig });
+    }
+
+    if (typeof xAxisInvert === 'boolean' && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
+      axesActor.setXConfig({ ...axesActor.getXConfig(), invert: xAxisInvert });
+    }
+
+    if (typeof yAxisInvert === 'boolean' && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
+      axesActor.setYConfig({ ...axesActor.getYConfig(), invert: yAxisInvert });
+    }
+
+    if (typeof zAxisInvert === 'boolean' && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
+      axesActor.setZConfig({ ...axesActor.getZConfig(), invert: zAxisInvert });
+    }
+
+    if (typeof axesActor.update === 'function') {
+      axesActor.update();
+    }
+
+    renderer.requestRender();
+
+    return () => {
+      const currentRenderer = renderer.get?.();
+      if (currentRenderer && axesActorRef.current) {
+        currentRenderer.removeActor(axesActorRef.current);
+        axesActorRef.current.delete?.();
+        axesActorRef.current = null;
+        renderer.requestRender();
+      }
+    };
+  }, [renderer, visible, config, xConfig, yConfig, zConfig, recenter, xAxisInvert, yAxisInvert, zAxisInvert]);
+
+  return null;
+};
+
+VtkAxesActor.displayName = 'VtkAxesActor';
 
 
 interface VtkMultiViewRootProps {

@@ -188,6 +188,97 @@ class MultiViewRoot(Component):
         }
 
 
+class AxesActor(Component):
+    """
+    Standalone 3D axes actor for scene orientation.
+
+    This wraps vtk.js `vtkAxesActor` and can be used alongside any
+    representation to show a classic XYZ triad.
+
+    Args:
+        visible: Whether the actor is visible (default: True)
+        config: Global axes actor config object
+        x_config: X axis-specific config (e.g. invert)
+        y_config: Y axis-specific config (e.g. invert)
+        z_config: Z axis-specific config (e.g. invert)
+        recenter: Convenience flag mapped to config.recenter
+        x_axis_invert: Convenience flag mapped to x_config.invert
+        y_axis_invert: Convenience flag mapped to y_config.invert
+        z_axis_invert: Convenience flag mapped to z_config.invert
+        id: Component ID
+        class_name: CSS classes
+
+    Example:
+        ```python
+        from refast_vtk_js import AxesActor, View, GeometryRepresentation, Algorithm
+
+        View(
+            children=[
+                AxesActor(
+                    recenter=True,
+                    x_axis_invert=False,
+                    y_axis_invert=False,
+                    z_axis_invert=False,
+                ),
+                GeometryRepresentation(
+                    children=[
+                        Algorithm(vtk_class="vtkConeSource")
+                    ]
+                ),
+            ]
+        )
+        ```
+    """
+
+    component_type = "VtkAxesActor"
+
+    def __init__(
+        self,
+        visible: bool = True,
+        config: dict[str, Any] | None = None,
+        x_config: dict[str, Any] | None = None,
+        y_config: dict[str, Any] | None = None,
+        z_config: dict[str, Any] | None = None,
+        recenter: bool | None = None,
+        x_axis_invert: bool | None = None,
+        y_axis_invert: bool | None = None,
+        z_axis_invert: bool | None = None,
+        id: str | None = None,
+        class_name: str = "",
+        **props: Any,
+    ):
+        super().__init__(id=id, class_name=class_name, **props)
+        self.visible = visible
+        self.config = config
+        self.x_config = x_config
+        self.y_config = y_config
+        self.z_config = z_config
+        self.recenter = recenter
+        self.x_axis_invert = x_axis_invert
+        self.y_axis_invert = y_axis_invert
+        self.z_axis_invert = z_axis_invert
+
+    def render(self) -> dict[str, Any]:
+        return {
+            "type": self.component_type,
+            "id": self.id,
+            "props": {
+                "visible": self.visible,
+                "config": self.config,
+                "x_config": self.x_config,
+                "y_config": self.y_config,
+                "z_config": self.z_config,
+                "recenter": self.recenter,
+                "x_axis_invert": self.x_axis_invert,
+                "y_axis_invert": self.y_axis_invert,
+                "z_axis_invert": self.z_axis_invert,
+                "class_name": self.class_name,
+                **self._serialize_extra_props(),
+            },
+            "children": self._render_children(),
+        }
+
+
 # ============================================================================
 # Representation Components
 # ============================================================================

@@ -9,6 +9,7 @@ from refast.extensions import Extension
 
 from .components import (
     Algorithm,
+    AxesActor,
     CellData,
     DataArray,
     Dataset,
@@ -83,6 +84,7 @@ class VtkExtension(Extension):
         """List of Python component classes provided by this extension."""
         return [
             View,
+            AxesActor,
             MultiViewRoot,
             GeometryRepresentation,
             Geometry2DRepresentation,
@@ -110,6 +112,7 @@ __all__ = [
     "VtkExtension",
     # View components
     "View",
+    "AxesActor",
     "MultiViewRoot",
     # Representation components
     "GeometryRepresentation",

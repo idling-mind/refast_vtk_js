@@ -10,6 +10,7 @@
 // Import all VTK component wrappers
 import {
   VtkView,
+  VtkAxesActor,
   VtkMultiViewRoot,
   VtkGeometryRepresentation,
   VtkGeometry2DRepresentation,
@@ -52,6 +53,7 @@ declare global {
 const COMPONENTS: Record<string, React.ComponentType<unknown>> = {
   // View components
   VtkView: VtkView as React.ComponentType<unknown>,
+  VtkAxesActor: VtkAxesActor as React.ComponentType<unknown>,
   VtkMultiViewRoot: VtkMultiViewRoot as React.ComponentType<unknown>,
   // Representation components
   VtkGeometryRepresentation: VtkGeometryRepresentation as React.ComponentType<unknown>,
@@ -116,6 +118,7 @@ registerComponents();
 // Export for direct imports (if bundled differently)
 export {
   VtkView,
+  VtkAxesActor,
   VtkMultiViewRoot,
   VtkGeometryRepresentation,
   VtkGeometry2DRepresentation,
