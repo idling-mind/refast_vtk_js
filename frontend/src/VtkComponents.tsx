@@ -16,6 +16,7 @@ import '@kitware/vtk.js/Rendering/OpenGL/Profiles/Volume';
 import vtkAxesActor from '@kitware/vtk.js/Rendering/Core/AxesActor';
 import vtkCubeAxesActor from '@kitware/vtk.js/Rendering/Core/CubeAxesActor';
 import vtkScalarBarActor from '@kitware/vtk.js/Rendering/Core/ScalarBarActor';
+import vtkOrientationMarkerWidget from '@kitware/vtk.js/Interaction/Widgets/OrientationMarkerWidget';
 
 // Import VTK.js sources/filters (needed for Algorithm component to find them by string name)
 // These imports register the classes with vtk.js factory, enabling vtkClass="vtkConeSource" etc.
@@ -566,6 +567,14 @@ interface VtkAxesActorProps {
   xAxisInvert?: boolean;
   yAxisInvert?: boolean;
   zAxisInvert?: boolean;
+  fixedInWindow?: boolean;
+  markerCorner?: 'TOP_LEFT' | 'TOP_RIGHT' | 'BOTTOM_LEFT' | 'BOTTOM_RIGHT' | string;
+  markerViewportSize?: number;
+  markerMinPixelSize?: number;
+  markerMaxPixelSize?: number;
+  axisLabelsEnabled?: boolean;
+  axisLabels?: Record<string, unknown>;
+  axisLabelStyle?: Record<string, unknown>;
   className?: string;
   'data-refast-id'?: string;
 }
@@ -581,10 +590,110 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
     xAxisInvert,
     yAxisInvert,
     zAxisInvert,
+    fixedInWindow = false,
+    markerCorner = 'BOTTOM_LEFT',
+    markerViewportSize = 0.2,
+    markerMinPixelSize = 50,
+    markerMaxPixelSize = 200,
+    axisLabelsEnabled = false,
+    axisLabels,
+    axisLabelStyle,
   } = props;
 
   const renderer = useRendererContext();
   const axesActorRef = useRef<any>(null);
+  const markerActorRef = useRef<any>(null);
+  const markerWidgetRef = useRef<any>(null);
+  const labelsOverlayRef = useRef<HTMLDivElement | null>(null);
+  const labelSubscriptionsRef = useRef<Array<{ unsubscribe: () => void }>>([]);
+  const labelResizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  const cleanupWorldActor = useCallback(() => {
+    const vtkRenderer = renderer.get?.();
+    if (vtkRenderer && axesActorRef.current) {
+      vtkRenderer.removeActor(axesActorRef.current);
+    }
+    axesActorRef.current?.delete?.();
+    axesActorRef.current = null;
+  }, [renderer]);
+
+  const cleanupMarkerWidget = useCallback(() => {
+    markerWidgetRef.current?.setEnabled?.(false);
+    markerWidgetRef.current?.delete?.();
+    markerWidgetRef.current = null;
+    markerActorRef.current?.delete?.();
+    markerActorRef.current = null;
+  }, []);
+
+  const cleanupLabelOverlay = useCallback(() => {
+    labelResizeObserverRef.current?.disconnect();
+    labelResizeObserverRef.current = null;
+
+    for (const sub of labelSubscriptionsRef.current) {
+      sub.unsubscribe();
+    }
+    labelSubscriptionsRef.current = [];
+
+    if (labelsOverlayRef.current?.parentElement) {
+      labelsOverlayRef.current.parentElement.removeChild(labelsOverlayRef.current);
+    }
+    labelsOverlayRef.current = null;
+  }, []);
+
+  const applyAxesConfig = useCallback(
+    (axesActor: any) => {
+      if (typeof axesActor.setVisibility === 'function') {
+        axesActor.setVisibility(!!visible);
+      }
+
+      if (config && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
+        axesActor.setConfig({ ...axesActor.getConfig(), ...config });
+      }
+
+      if (typeof recenter === 'boolean' && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
+        axesActor.setConfig({ ...axesActor.getConfig(), recenter: recenter });
+      }
+
+      if (xConfig && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
+        axesActor.setXConfig({ ...axesActor.getXConfig(), ...xConfig });
+      }
+
+      if (yConfig && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
+        axesActor.setYConfig({ ...axesActor.getYConfig(), ...yConfig });
+      }
+
+      if (zConfig && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
+        axesActor.setZConfig({ ...axesActor.getZConfig(), ...zConfig });
+      }
+
+      if (typeof xAxisInvert === 'boolean' && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
+        axesActor.setXConfig({ ...axesActor.getXConfig(), invert: xAxisInvert });
+      }
+
+      if (typeof yAxisInvert === 'boolean' && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
+        axesActor.setYConfig({ ...axesActor.getYConfig(), invert: yAxisInvert });
+      }
+
+      if (typeof zAxisInvert === 'boolean' && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
+        axesActor.setZConfig({ ...axesActor.getZConfig(), invert: zAxisInvert });
+      }
+
+      if (typeof axesActor.update === 'function') {
+        axesActor.update();
+      }
+    },
+    [
+      visible,
+      config,
+      xConfig,
+      yConfig,
+      zConfig,
+      recenter,
+      xAxisInvert,
+      yAxisInvert,
+      zAxisInvert,
+    ]
+  );
 
   useEffect(() => {
     const vtkRenderer = renderer.get?.();
@@ -592,65 +701,177 @@ export const VtkAxesActor: React.FC<VtkAxesActorProps> = (props) => {
       return;
     }
 
-    if (!axesActorRef.current) {
+    cleanupWorldActor();
+    cleanupMarkerWidget();
+    cleanupLabelOverlay();
+
+    if (!fixedInWindow) {
       axesActorRef.current = vtkAxesActor.newInstance();
       vtkRenderer.addActor(axesActorRef.current);
+      applyAxesConfig(axesActorRef.current);
+      renderer.requestRender();
+
+      return () => {
+        cleanupWorldActor();
+        renderer.requestRender();
+      };
     }
 
-    const axesActor = axesActorRef.current;
-
-    if (typeof axesActor.setVisibility === 'function') {
-      axesActor.setVisibility(!!visible);
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+    if (!interactor) {
+      return;
     }
 
-    if (config && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
-      axesActor.setConfig({ ...axesActor.getConfig(), ...config });
-    }
+    markerActorRef.current = vtkAxesActor.newInstance();
+    applyAxesConfig(markerActorRef.current);
 
-    if (typeof recenter === 'boolean' && typeof axesActor.getConfig === 'function' && typeof axesActor.setConfig === 'function') {
-      axesActor.setConfig({ ...axesActor.getConfig(), recenter: recenter });
-    }
+    markerWidgetRef.current = vtkOrientationMarkerWidget.newInstance({
+      actor: markerActorRef.current,
+      interactor: interactor,
+      parentRenderer: vtkRenderer,
+    });
 
-    if (xConfig && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
-      axesActor.setXConfig({ ...axesActor.getXConfig(), ...xConfig });
-    }
+    const validCorners = new Set(['TOP_LEFT', 'TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT']);
+    const normalizedCorner = String(markerCorner).toUpperCase();
+    const resolvedCorner = validCorners.has(normalizedCorner) ? normalizedCorner : 'BOTTOM_LEFT';
 
-    if (yConfig && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
-      axesActor.setYConfig({ ...axesActor.getYConfig(), ...yConfig });
-    }
+    markerWidgetRef.current.setViewportCorner?.(resolvedCorner);
+    markerWidgetRef.current.setViewportSize?.(markerViewportSize);
+    markerWidgetRef.current.setMinPixelSize?.(markerMinPixelSize);
+    markerWidgetRef.current.setMaxPixelSize?.(markerMaxPixelSize);
+    markerWidgetRef.current.setEnabled?.(!!visible);
+    markerWidgetRef.current.updateMarkerOrientation?.();
 
-    if (zConfig && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
-      axesActor.setZConfig({ ...axesActor.getZConfig(), ...zConfig });
-    }
+    if (axisLabelsEnabled) {
+      const markerRenderer = markerWidgetRef.current.getRenderer?.();
+      const container = interactor.getContainer?.();
+      const view = interactor.getView?.();
 
-    if (typeof xAxisInvert === 'boolean' && typeof axesActor.getXConfig === 'function' && typeof axesActor.setXConfig === 'function') {
-      axesActor.setXConfig({ ...axesActor.getXConfig(), invert: xAxisInvert });
-    }
+      if (markerRenderer && container && view) {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.left = '0';
+        overlay.style.top = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '2';
 
-    if (typeof yAxisInvert === 'boolean' && typeof axesActor.getYConfig === 'function' && typeof axesActor.setYConfig === 'function') {
-      axesActor.setYConfig({ ...axesActor.getYConfig(), invert: yAxisInvert });
-    }
+        const makeLabel = (text: string) => {
+          const el = document.createElement('div');
+          const css = axisLabelStyle || {};
+          const color = String(css.color ?? css.fontColor ?? '#ffffff');
+          const fontSize = String(css.fontSize ?? css.font_size ?? '13px');
+          const fontWeight = String(css.fontWeight ?? css.font_weight ?? 700);
 
-    if (typeof zAxisInvert === 'boolean' && typeof axesActor.getZConfig === 'function' && typeof axesActor.setZConfig === 'function') {
-      axesActor.setZConfig({ ...axesActor.getZConfig(), invert: zAxisInvert });
-    }
+          el.textContent = text;
+          el.style.position = 'absolute';
+          el.style.color = color;
+          el.style.fontSize = fontSize;
+          el.style.fontWeight = fontWeight;
+          el.style.textShadow = '0 1px 2px rgba(0,0,0,0.65)';
+          el.style.transform = 'translate(-50%, -50%)';
+          overlay.appendChild(el);
+          return el;
+        };
 
-    if (typeof axesActor.update === 'function') {
-      axesActor.update();
+        const labels = axisLabels || {};
+        const xLabel = makeLabel(String(labels.x ?? labels.x_label ?? labels.xPlus ?? labels.x_plus ?? 'X'));
+        const yLabel = makeLabel(String(labels.y ?? labels.y_label ?? labels.yPlus ?? labels.y_plus ?? 'Y'));
+        const zLabel = makeLabel(String(labels.z ?? labels.z_label ?? labels.zPlus ?? labels.z_plus ?? 'Z'));
+
+        labelsOverlayRef.current = overlay;
+        container.appendChild(overlay);
+
+        // Marker uses a recentered triad by default, so labels track near arrow tips.
+        const getTipCoordinates = (): Record<'x' | 'y' | 'z', [number, number, number]> => {
+          const cfg = (config || {}) as Record<string, unknown>;
+          const centered = typeof recenter === 'boolean' ? recenter : (cfg.recenter as boolean | undefined) ?? true;
+          const tip = centered ? 0.56 : 1.06;
+          const xInv = typeof xAxisInvert === 'boolean' ? xAxisInvert : (xConfig?.invert as boolean | undefined) ?? false;
+          const yInv = typeof yAxisInvert === 'boolean' ? yAxisInvert : (yConfig?.invert as boolean | undefined) ?? false;
+          const zInv = typeof zAxisInvert === 'boolean' ? zAxisInvert : (zConfig?.invert as boolean | undefined) ?? false;
+
+          return {
+            x: [xInv ? -tip : tip, 0, 0],
+            y: [0, yInv ? -tip : tip, 0],
+            z: [0, 0, zInv ? -tip : tip],
+          };
+        };
+
+        const updateOverlayPositions = () => {
+          const canvas = view.getCanvas?.();
+          if (!canvas) {
+            return;
+          }
+
+          const canvasHeight = canvas.height;
+          const tips = getTipCoordinates();
+
+          const positionLabel = (el: HTMLDivElement, point: [number, number, number], dx: number, dy: number) => {
+            const display = view.worldToDisplay(point[0], point[1], point[2], markerRenderer);
+            const x = display[0] + dx;
+            const y = canvasHeight - display[1] + dy;
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+          };
+
+          positionLabel(xLabel, tips.x, 10, 0);
+          positionLabel(yLabel, tips.y, 0, -10);
+          positionLabel(zLabel, tips.z, 8, 8);
+        };
+
+        updateOverlayPositions();
+
+        const camera = vtkRenderer.getActiveCamera?.();
+        if (camera?.onModified) {
+          labelSubscriptionsRef.current.push(camera.onModified(updateOverlayPositions));
+        }
+        if (interactor.onAnimation) {
+          labelSubscriptionsRef.current.push(interactor.onAnimation(updateOverlayPositions));
+        }
+        if (interactor.onEndAnimation) {
+          labelSubscriptionsRef.current.push(interactor.onEndAnimation(updateOverlayPositions));
+        }
+
+        labelResizeObserverRef.current = new ResizeObserver(() => {
+          updateOverlayPositions();
+        });
+        labelResizeObserverRef.current.observe(container);
+      }
     }
 
     renderer.requestRender();
 
     return () => {
-      const currentRenderer = renderer.get?.();
-      if (currentRenderer && axesActorRef.current) {
-        currentRenderer.removeActor(axesActorRef.current);
-        axesActorRef.current.delete?.();
-        axesActorRef.current = null;
-        renderer.requestRender();
-      }
+      cleanupMarkerWidget();
+      cleanupLabelOverlay();
+      renderer.requestRender();
     };
-  }, [renderer, visible, config, xConfig, yConfig, zConfig, recenter, xAxisInvert, yAxisInvert, zAxisInvert]);
+  }, [
+    renderer,
+    fixedInWindow,
+    markerCorner,
+    markerViewportSize,
+    markerMinPixelSize,
+    markerMaxPixelSize,
+    axisLabelsEnabled,
+    cleanupWorldActor,
+    cleanupMarkerWidget,
+    cleanupLabelOverlay,
+    applyAxesConfig,
+    axisLabels,
+    axisLabelStyle,
+    recenter,
+    xAxisInvert,
+    yAxisInvert,
+    zAxisInvert,
+    config,
+    xConfig,
+    yConfig,
+    zConfig,
+    visible,
+  ]);
 
   return null;
 };

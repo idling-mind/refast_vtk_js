@@ -192,8 +192,8 @@ class AxesActor(Component):
     """
     Standalone 3D axes actor for scene orientation.
 
-    This wraps vtk.js `vtkAxesActor` and can be used alongside any
-    representation to show a classic XYZ triad.
+    This wraps vtk.js `vtkAxesActor` and can also render as a fixed
+    orientation marker overlay in a viewport corner.
 
     Args:
         visible: Whether the actor is visible (default: True)
@@ -205,6 +205,15 @@ class AxesActor(Component):
         x_axis_invert: Convenience flag mapped to x_config.invert
         y_axis_invert: Convenience flag mapped to y_config.invert
         z_axis_invert: Convenience flag mapped to z_config.invert
+        fixed_in_window: Render as a fixed orientation marker overlay
+        marker_corner: Marker corner ('TOP_LEFT', 'TOP_RIGHT', 'BOTTOM_LEFT', 'BOTTOM_RIGHT')
+        marker_viewport_size: Relative marker size in viewport (0-1)
+        marker_min_pixel_size: Minimum marker size in pixels
+        marker_max_pixel_size: Maximum marker size in pixels
+        axis_labels_enabled: Use annotated cube marker with axis labels
+        axis_labels: Label mapping for cube faces with keys:
+            'x_plus', 'x_minus', 'y_plus', 'y_minus', 'z_plus', 'z_minus'
+        axis_label_style: Style override for annotated cube text/faces
         id: Component ID
         class_name: CSS classes
 
@@ -215,6 +224,16 @@ class AxesActor(Component):
         View(
             children=[
                 AxesActor(
+                    fixed_in_window=True,
+                    axis_labels_enabled=True,
+                    axis_labels={
+                        "x_plus": "+X",
+                        "x_minus": "-X",
+                        "y_plus": "+Y",
+                        "y_minus": "-Y",
+                        "z_plus": "+Z",
+                        "z_minus": "-Z",
+                    },
                     recenter=True,
                     x_axis_invert=False,
                     y_axis_invert=False,
@@ -243,6 +262,14 @@ class AxesActor(Component):
         x_axis_invert: bool | None = None,
         y_axis_invert: bool | None = None,
         z_axis_invert: bool | None = None,
+        fixed_in_window: bool = False,
+        marker_corner: str = "BOTTOM_LEFT",
+        marker_viewport_size: float = 0.2,
+        marker_min_pixel_size: int = 50,
+        marker_max_pixel_size: int = 200,
+        axis_labels_enabled: bool = False,
+        axis_labels: dict[str, str] | None = None,
+        axis_label_style: dict[str, Any] | None = None,
         id: str | None = None,
         class_name: str = "",
         **props: Any,
@@ -257,6 +284,14 @@ class AxesActor(Component):
         self.x_axis_invert = x_axis_invert
         self.y_axis_invert = y_axis_invert
         self.z_axis_invert = z_axis_invert
+        self.fixed_in_window = fixed_in_window
+        self.marker_corner = marker_corner
+        self.marker_viewport_size = marker_viewport_size
+        self.marker_min_pixel_size = marker_min_pixel_size
+        self.marker_max_pixel_size = marker_max_pixel_size
+        self.axis_labels_enabled = axis_labels_enabled
+        self.axis_labels = axis_labels
+        self.axis_label_style = axis_label_style
 
     def render(self) -> dict[str, Any]:
         return {
@@ -272,6 +307,14 @@ class AxesActor(Component):
                 "x_axis_invert": self.x_axis_invert,
                 "y_axis_invert": self.y_axis_invert,
                 "z_axis_invert": self.z_axis_invert,
+                "fixed_in_window": self.fixed_in_window,
+                "marker_corner": self.marker_corner,
+                "marker_viewport_size": self.marker_viewport_size,
+                "marker_min_pixel_size": self.marker_min_pixel_size,
+                "marker_max_pixel_size": self.marker_max_pixel_size,
+                "axis_labels_enabled": self.axis_labels_enabled,
+                "axis_labels": self.axis_labels,
+                "axis_label_style": self.axis_label_style,
                 "class_name": self.class_name,
                 **self._serialize_extra_props(),
             },
