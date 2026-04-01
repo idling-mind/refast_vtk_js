@@ -169,6 +169,50 @@ async def set_scalar_bar_off(ctx: Context):
     await ctx.update_props("geom-main", {"show_scalar_bar": False})
 
 
+async def set_scalar_bar_light_labels(ctx: Context):
+    """Set scalar bar title/tick labels to bright colors for dark backgrounds."""
+    await ctx.update_props(
+        "geom-main",
+        {
+            "scalar_bar_style": {
+                "axisTextStyle": {
+                    "fontColor": "#ffe082",
+                    "fontFamily": "Arial",
+                    "fontSize": 20,
+                    "fontStyle": "bold",
+                },
+                "tickTextStyle": {
+                    "fontColor": "#f5f5f5",
+                    "fontFamily": "Arial",
+                    "fontSize": 14,
+                },
+            }
+        },
+    )
+
+
+async def set_scalar_bar_warm_labels(ctx: Context):
+    """Set scalar bar title/tick labels to warm accent colors."""
+    await ctx.update_props(
+        "geom-main",
+        {
+            "scalar_bar_style": {
+                "axisTextStyle": {
+                    "fontColor": "#ff6f61",
+                    "fontFamily": "Arial",
+                    "fontSize": 20,
+                    "fontStyle": "bold",
+                },
+                "tickTextStyle": {
+                    "fontColor": "#ffd166",
+                    "fontFamily": "Arial",
+                    "fontSize": 14,
+                },
+            }
+        },
+    )
+
+
 async def set_surface_with_edges(ctx: Context):
     """Set surface representation with edge visibility."""
     await ctx.update_props(
@@ -239,6 +283,14 @@ def home(ctx: Context):
                         on_click=ctx.callback(set_scalar_bar_off),
                     ),
                     Button(
+                        "Scalar Bar: Light Labels",
+                        on_click=ctx.callback(set_scalar_bar_light_labels),
+                    ),
+                    Button(
+                        "Scalar Bar: Warm Labels",
+                        on_click=ctx.callback(set_scalar_bar_warm_labels),
+                    ),
+                    Button(
                         "Surface + Edges",
                         on_click=ctx.callback(set_surface_with_edges),
                     ),
@@ -277,8 +329,20 @@ def home(ctx: Context):
                         show_cube_axes=True,
                         cube_axes_style={"ticks": 4},
                         show_scalar_bar=True,
-                        scalar_bar_title=True,
-                        scalar_bar_style={"axisLabel": "elevation"},
+                        scalar_bar_title="elevation",
+                        scalar_bar_style={
+                            "axisTextStyle": {
+                                "fontColor": "#ffe082",
+                                "fontFamily": "Arial",
+                                "fontSize": 20,
+                                "fontStyle": "bold",
+                            },
+                            "tickTextStyle": {
+                                "fontColor": "#f5f5f5",
+                                "fontFamily": "Arial",
+                                "fontSize": 14,
+                            },
+                        },
                         children=[build_colored_cube_polydata()],
                     ),
                     GeometryRepresentation(
