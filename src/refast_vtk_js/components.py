@@ -89,9 +89,9 @@ class View(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.background = background
         self.interactive = interactive
         self.camera = camera
@@ -166,9 +166,9 @@ class MultiViewRoot(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.style = style
         self.render_window_style = render_window_style
         if children:
@@ -274,9 +274,9 @@ class AxesActor(Component):
         axis_label_style: dict[str, Any] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.visible = visible
         self.size = size
         self.config = config
@@ -388,9 +388,9 @@ class GeometryRepresentation(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.actor = actor
         self.mapper = mapper
         self.property = property
@@ -463,9 +463,9 @@ class Geometry2DRepresentation(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.actor = actor
         self.mapper = mapper
         self.property = property
@@ -559,9 +559,9 @@ class VolumeRepresentation(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.actor = actor
         self.mapper = mapper
         self.property = property
@@ -655,9 +655,9 @@ class SliceRepresentation(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.actor = actor
         self.mapper = mapper
         self.property = property
@@ -759,9 +759,9 @@ class PolyData(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.points = points
         self.verts = verts
         self.lines = lines
@@ -841,9 +841,9 @@ class ImageData(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.dimensions = dimensions
         self.spacing = spacing
         self.origin = origin
@@ -889,9 +889,9 @@ class Dataset(Component):
         dataset: Any = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.dataset = dataset
 
     def render(self) -> dict[str, Any]:
@@ -961,9 +961,9 @@ class DataArray(Component):
         range: list[float] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.name = name
         self.type = type
         self.values = values
@@ -1023,9 +1023,9 @@ class PointData(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         if children:
             self._children = children
 
@@ -1075,9 +1075,9 @@ class CellData(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         if children:
             self._children = children
 
@@ -1109,9 +1109,9 @@ class FieldData(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         if children:
             self._children = children
 
@@ -1179,9 +1179,9 @@ class Algorithm(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.vtk_class = vtk_class
         self.state = state
         self.port = port
@@ -1254,9 +1254,9 @@ class Reader(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.vtk_class = vtk_class
         self.url = url
         self.url_options = url_options
@@ -1340,9 +1340,9 @@ class Picking(Component):
         on_hover_debounce_wait: int = 4,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.enabled = enabled
         self.on_hover = on_hover
         self.on_click = on_click
@@ -1406,9 +1406,9 @@ class VolumeController(Component):
         rescale_color_map: bool = True,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.size = size
         self.rescale_color_map = rescale_color_map
 
@@ -1477,9 +1477,9 @@ class ShareDataSetRoot(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         if children:
             self._children = children
 
@@ -1513,9 +1513,9 @@ class RegisterDataSet(Component):
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.dataset_id = dataset_id
         if children:
             self._children = children
@@ -1552,9 +1552,9 @@ class UseDataSet(Component):
         port: int = 0,
         id: str | None = None,
         class_name: str = "",
-        **props: Any,
+        extra_props: dict[str, Any] | None = None,
     ):
-        super().__init__(id=id, class_name=class_name, **props)
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.dataset_id = dataset_id
         self.port = port
 
