@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({ jsxRuntime: 'classic' })],
   build: {
     outDir: '../src/refast_vtk_js/static',
     emptyOutDir: true,
@@ -30,7 +30,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 5000,
   },
   define: {
-    'process.env': {},
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env': '{}',
   },
   optimizeDeps: {
     include: ['@kitware/vtk.js', 'react-vtk-js'],
