@@ -51,7 +51,7 @@ class CustomBuildHook(BuildHookInterface):
 
         self.app.display_info("Installing frontend dependencies...")
         subprocess.run(
-            [npm_cmd, "install"],
+            [npm_cmd, "install", "--legacy-peer-deps"],
             cwd=frontend_dir,
             check=True,
             shell=(os.name == "nt"),

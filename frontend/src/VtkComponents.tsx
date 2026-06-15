@@ -6,7 +6,7 @@
  * and callback invocation.
  */
 
-import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 
 // Import VTK.js rendering profiles
 import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
@@ -302,9 +302,10 @@ interface VtkViewProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
+export function VtkView(props: VtkViewProps) {
   const {
     background,
     interactive,
@@ -318,6 +319,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
     className,
     children,
     'data-refast-id': dataRefastId,
+    ref,
   } = props;
 
   // Ref for the outer wrapper div (used by ResizeObserver)
@@ -333,7 +335,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
       if (typeof ref === 'function') {
         ref(instance);
       } else if (ref) {
-        (ref as React.MutableRefObject<any>).current = instance;
+        (ref as React.RefObject<any>).current = instance;
       }
     },
     [ref],
@@ -552,7 +554,7 @@ export const VtkView = forwardRef<unknown, VtkViewProps>((props, ref) => {
       </View>
     </div>
   );
-});
+}
 
 VtkView.displayName = 'VtkView';
 
@@ -933,7 +935,7 @@ interface VtkMultiViewRootProps {
   'data-refast-id'?: string;
 }
 
-export const VtkMultiViewRoot = forwardRef<unknown, VtkMultiViewRootProps>((props, _ref) => {
+export function VtkMultiViewRoot(props: VtkMultiViewRootProps) {
   const {
     style,
     renderWindowStyle,
@@ -952,7 +954,7 @@ export const VtkMultiViewRoot = forwardRef<unknown, VtkMultiViewRootProps>((prop
       </MultiViewRoot>
     </div>
   );
-});
+}
 
 VtkMultiViewRoot.displayName = 'VtkMultiViewRoot';
 
@@ -977,6 +979,7 @@ interface VtkGeometryRepresentationProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
 interface GeometryDecorationProps {
@@ -1122,8 +1125,7 @@ function GeometryDecorationActors({
   return null;
 }
 
-export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresentationProps>(
-  (props, ref) => {
+export function VtkGeometryRepresentation(props: VtkGeometryRepresentationProps) {
     const {
       id,
       actor,
@@ -1139,6 +1141,7 @@ export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresen
       onDataAvailable,
       children,
       'data-refast-id': dataRefastId,
+      ref,
     } = props;
 
     const handleDataAvailable = useCallback(() => {
@@ -1191,8 +1194,7 @@ export const VtkGeometryRepresentation = forwardRef<unknown, VtkGeometryRepresen
         {children}
       </GeometryRepresentation>
     );
-  }
-);
+}
 
 VtkGeometryRepresentation.displayName = 'VtkGeometryRepresentation';
 
@@ -1209,10 +1211,10 @@ interface VtkGeometry2DRepresentationProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkGeometry2DRepresentation = forwardRef<unknown, VtkGeometry2DRepresentationProps>(
-  (props, ref) => {
+export function VtkGeometry2DRepresentation(props: VtkGeometry2DRepresentationProps) {
     const {
       id,
       actor,
@@ -1224,6 +1226,7 @@ export const VtkGeometry2DRepresentation = forwardRef<unknown, VtkGeometry2DRepr
       onDataAvailable,
       children,
       'data-refast-id': dataRefastId,
+      ref,
     } = props;
 
     const handleDataAvailable = useCallback(() => {
@@ -1248,8 +1251,7 @@ export const VtkGeometry2DRepresentation = forwardRef<unknown, VtkGeometry2DRepr
         {children}
       </Geometry2DRepresentation>
     );
-  }
-);
+}
 
 VtkGeometry2DRepresentation.displayName = 'VtkGeometry2DRepresentation';
 
@@ -1266,10 +1268,10 @@ interface VtkVolumeRepresentationProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkVolumeRepresentation = forwardRef<unknown, VtkVolumeRepresentationProps>(
-  (props, ref) => {
+export function VtkVolumeRepresentation(props: VtkVolumeRepresentationProps) {
     const {
       id,
       actor,
@@ -1281,6 +1283,7 @@ export const VtkVolumeRepresentation = forwardRef<unknown, VtkVolumeRepresentati
       onDataChanged,
       children,
       'data-refast-id': dataRefastId,
+      ref,
     } = props;
 
     const handleDataAvailable = useCallback(() => {
@@ -1309,8 +1312,7 @@ export const VtkVolumeRepresentation = forwardRef<unknown, VtkVolumeRepresentati
         {children}
       </VolumeRepresentation>
     );
-  }
-);
+}
 
 VtkVolumeRepresentation.displayName = 'VtkVolumeRepresentation';
 
@@ -1332,10 +1334,10 @@ interface VtkSliceRepresentationProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkSliceRepresentation = forwardRef<unknown, VtkSliceRepresentationProps>(
-  (props, ref) => {
+export function VtkSliceRepresentation(props: VtkSliceRepresentationProps) {
     const {
       id,
       actor,
@@ -1352,6 +1354,7 @@ export const VtkSliceRepresentation = forwardRef<unknown, VtkSliceRepresentation
       onDataAvailable,
       children,
       'data-refast-id': dataRefastId,
+      ref,
     } = props;
 
     const handleDataAvailable = useCallback(() => {
@@ -1381,8 +1384,7 @@ export const VtkSliceRepresentation = forwardRef<unknown, VtkSliceRepresentation
         {children}
       </SliceRepresentation>
     );
-  }
-);
+}
 
 VtkSliceRepresentation.displayName = 'VtkSliceRepresentation';
 
@@ -1405,9 +1407,10 @@ interface VtkPolyDataProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkPolyData = forwardRef<unknown, VtkPolyDataProps>((props, ref) => {
+export function VtkPolyData(props: VtkPolyDataProps) {
   const {
     points,
     verts,
@@ -1417,6 +1420,7 @@ export const VtkPolyData = forwardRef<unknown, VtkPolyDataProps>((props, ref) =>
     connectivity,
     port,
     children,
+    ref,
   } = props;
 
   return (
@@ -1433,7 +1437,7 @@ export const VtkPolyData = forwardRef<unknown, VtkPolyDataProps>((props, ref) =>
       {children}
     </PolyData>
   );
-});
+}
 
 VtkPolyData.displayName = 'VtkPolyData';
 
@@ -1447,9 +1451,10 @@ interface VtkImageDataProps {
   className?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkImageData = forwardRef<unknown, VtkImageDataProps>((props, ref) => {
+export function VtkImageData(props: VtkImageDataProps) {
   const {
     dimensions,
     spacing,
@@ -1457,6 +1462,7 @@ export const VtkImageData = forwardRef<unknown, VtkImageDataProps>((props, ref) 
     direction,
     port,
     children,
+    ref,
   } = props;
 
   return (
@@ -1471,7 +1477,7 @@ export const VtkImageData = forwardRef<unknown, VtkImageDataProps>((props, ref) 
       {children}
     </ImageData>
   );
-});
+}
 
 VtkImageData.displayName = 'VtkImageData';
 
@@ -1656,9 +1662,10 @@ interface VtkPickingProps {
   onHoverDebounceWait?: number;
   className?: string;
   'data-refast-id'?: string;
+  ref?: React.Ref<unknown>;
 }
 
-export const VtkPicking = forwardRef<unknown, VtkPickingProps>((props, ref) => {
+export function VtkPicking(props: VtkPickingProps) {
   const {
     enabled,
     onHover,
@@ -1667,6 +1674,7 @@ export const VtkPicking = forwardRef<unknown, VtkPickingProps>((props, ref) => {
     onPointerUp,
     pointerSize,
     onHoverDebounceWait,
+    ref,
   } = props;
 
   const handleHover = useCallback(
@@ -1725,7 +1733,7 @@ export const VtkPicking = forwardRef<unknown, VtkPickingProps>((props, ref) => {
       onHoverDebounceWait={onHoverDebounceWait}
     />
   );
-});
+}
 
 VtkPicking.displayName = 'VtkPicking';
 

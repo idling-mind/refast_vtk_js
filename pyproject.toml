@@ -21,7 +21,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "refast>=0.0.1",
 ]

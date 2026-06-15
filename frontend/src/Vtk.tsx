@@ -35,7 +35,7 @@ export function Vtk({
   onChange,
   style,
   'data-refast-id': dataRefastId,
-}: VtkProps): React.ReactElement {
+}: VtkProps): React.ReactElement<any> {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState(initialValue);
 
