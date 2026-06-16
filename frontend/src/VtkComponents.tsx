@@ -29,6 +29,7 @@ import '@kitware/vtk.js/Filters/Sources/LineSource';
 import '@kitware/vtk.js/Filters/Sources/PointSource';
 import '@kitware/vtk.js/Filters/Sources/CircleSource';
 import '@kitware/vtk.js/Filters/Sources/ArrowSource';
+import '@kitware/vtk.js/Filters/Core/ThresholdPoints';
 
 // Import color transfer function presets (required for colorMapPreset to work)
 // The ColorMaps module contains the preset registry that VolumeRepresentation uses
@@ -1603,6 +1604,46 @@ export const VtkAlgorithm: React.FC<VtkAlgorithmProps> = (props) => {
 };
 
 VtkAlgorithm.displayName = 'VtkAlgorithm';
+
+
+interface VtkThresholdPointsProps {
+  criterias?: Array<{
+    arrayName?: string;
+    array_name?: string;
+    fieldAssociation?: 'PointData' | 'Points';
+    field_association?: 'PointData' | 'Points';
+    operation?: 'Above' | 'Below';
+    value?: number;
+  }>;
+  port?: number;
+  className?: string;
+  children?: React.ReactNode;
+  'data-refast-id'?: string;
+}
+
+export const VtkThresholdPoints: React.FC<VtkThresholdPointsProps> = (props) => {
+  const { criterias, port, children } = props;
+
+  // Convert snake_case properties inside criterias if any to make it safe
+  const resolvedCriterias = (criterias || []).map((c) => ({
+    arrayName: c.arrayName || c.array_name,
+    fieldAssociation: c.fieldAssociation || c.field_association,
+    operation: c.operation,
+    value: typeof c.value === 'string' ? Number(c.value) : c.value,
+  }));
+
+  return (
+    <Algorithm
+      vtkClass="vtkThresholdPoints"
+      state={{ criterias: resolvedCriterias }}
+      port={port}
+    >
+      {children}
+    </Algorithm>
+  );
+};
+
+VtkThresholdPoints.displayName = 'VtkThresholdPoints';
 
 
 interface VtkReaderProps {

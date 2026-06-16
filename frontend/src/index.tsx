@@ -24,6 +24,7 @@ import {
   VtkCellData,
   VtkFieldData,
   VtkAlgorithm,
+  VtkThresholdPoints,
   VtkReader,
   VtkPicking,
   VtkVolumeController,
@@ -71,6 +72,7 @@ const COMPONENTS: Record<string, React.ComponentType<unknown>> = {
   VtkFieldData: VtkFieldData as React.ComponentType<unknown>,
   // Algorithm & Reader
   VtkAlgorithm: VtkAlgorithm as React.ComponentType<unknown>,
+  VtkThresholdPoints: VtkThresholdPoints as React.ComponentType<unknown>,
   VtkReader: VtkReader as React.ComponentType<unknown>,
   // Interaction
   VtkPicking: VtkPicking as React.ComponentType<unknown>,
@@ -132,6 +134,7 @@ export {
   VtkCellData,
   VtkFieldData,
   VtkAlgorithm,
+  VtkThresholdPoints,
   VtkReader,
   VtkPicking,
   VtkVolumeController,

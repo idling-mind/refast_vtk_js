@@ -25,6 +25,7 @@ from .components import (
     RegisterDataSet,
     ShareDataSetRoot,
     SliceRepresentation,
+    ThresholdPoints,
     UseDataSet,
     View,
     VolumeController,
@@ -98,6 +99,7 @@ class VtkExtension(Extension):
             CellData,
             FieldData,
             Algorithm,
+            ThresholdPoints,
             Reader,
             Picking,
             VolumeController,
@@ -130,6 +132,7 @@ __all__ = [
     "FieldData",
     # Algorithm & Reader
     "Algorithm",
+    "ThresholdPoints",
     "Reader",
     # Interaction
     "Picking",

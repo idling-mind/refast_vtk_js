@@ -1203,6 +1203,77 @@ class Algorithm(Component):
         }
 
 
+class ThresholdPoints(Component):
+    """
+    ThresholdPoints filter component.
+
+    Filters PolyData points based on one or more scalar threshold criteria.
+    Only points satisfying all criteria are kept.
+
+    Args:
+        criterias: List of criteria dictionary objects, or a single criteria dict.
+            Each criteria dictionary contains:
+            - array_name (str): Name of array to threshold by (e.g., 'sine wave', 'x', 'y', 'z')
+            - field_association (Literal['PointData', 'Points']): Field association
+            - operation (Literal['Above', 'Below']): Threshold operation ('Above' or 'Below')
+            - value (float): Threshold value
+        port: Output port number for downstream connection (default: 0)
+        id: Component ID
+        class_name: CSS classes
+        extra_props: Extra properties to pass to the React component
+
+    Example:
+        ```python
+        from refast_vtk_js import ThresholdPoints
+
+        ThresholdPoints(
+            criterias=[
+                {
+                    "array_name": "sine wave",
+                    "field_association": "PointData",
+                    "operation": "Above",
+                    "value": 30.0
+                }
+            ],
+            children=[...],
+        )
+        ```
+    """
+
+    component_type = "VtkThresholdPoints"
+
+    def __init__(
+        self,
+        criterias: list[dict[str, Any]] | dict[str, Any] | None = None,
+        port: int = 0,
+        children: list["Component | str"] | None = None,
+        id: str | None = None,
+        class_name: str = "",
+        extra_props: dict[str, Any] | None = None,
+    ):
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
+        if isinstance(criterias, dict):
+            self.criterias = [criterias]
+        else:
+            self.criterias = criterias or []
+        self.port = port
+        if children:
+            self._children = children
+
+    def render(self) -> dict[str, Any]:
+        return {
+            "type": self.component_type,
+            "id": self.id,
+            "props": {
+                "criterias": self.criterias,
+                "port": self.port,
+                "class_name": self.class_name,
+                **self._serialize_extra_props(),
+            },
+            "children": self._render_children(),
+        }
+
+
 class Reader(Component):
     """
     VTK file reader component.
