@@ -93,6 +93,7 @@ def home(ctx: Context):
                 id="vtk-view",
                 background=[0.1, 0.15, 0.2],
                 style={"width": "100%", "height": "500px"},
+                auto_reset_camera=False,
                 children=[
                     # Register picking before geometry so it receives events
                     Picking(on_click=ctx.callback(handle_click), pointer_size=5),

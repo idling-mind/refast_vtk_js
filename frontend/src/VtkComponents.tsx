@@ -311,17 +311,24 @@ export function VtkView(props: VtkViewProps) {
     background,
     interactive,
     camera,
-    autoResetCamera,
-    interactorSettings,
-    autoCenterOfRotation,
-    syncGroup,
+    autoResetCamera: autoResetCameraProp,
+    interactorSettings: interactorSettingsProp,
+    autoCenterOfRotation: autoCenterOfRotationProp,
+    syncGroup: syncGroupProp,
     style,
-    renderWindowStyle,
+    renderWindowStyle: renderWindowStyleProp,
     className,
     children,
     'data-refast-id': dataRefastId,
     ref,
   } = props;
+
+  const rawProps = props as any;
+  const autoResetCamera = autoResetCameraProp !== undefined ? autoResetCameraProp : rawProps.auto_reset_camera;
+  const interactorSettings = interactorSettingsProp !== undefined ? interactorSettingsProp : rawProps.interactor_settings;
+  const autoCenterOfRotation = autoCenterOfRotationProp !== undefined ? autoCenterOfRotationProp : rawProps.auto_center_of_rotation;
+  const syncGroup = syncGroupProp !== undefined ? syncGroupProp : rawProps.sync_group;
+  const renderWindowStyle = renderWindowStyleProp !== undefined ? renderWindowStyleProp : rawProps.render_window_style;
 
   // Ref for the outer wrapper div (used by ResizeObserver)
   const containerRef = useRef<HTMLDivElement>(null);
