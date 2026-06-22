@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "refast_vtk_js"
-version = "0.1.0"
+version = "0.1.1"
 description = "Refast extension for vtk"
 readme = "README.md"
 authors = [
