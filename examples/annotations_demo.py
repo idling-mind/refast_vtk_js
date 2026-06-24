@@ -28,6 +28,7 @@ VIEW_CONTROLS = [
     {"button": 2, "action": "Rotate"},
     {"button": 2, "action": "Zoom", "shift": True},
     {"button": 2, "action": "Pan", "control": True},
+    {"button": 2, "action": "Zoom", "scrollEnabled": True},
     {
         "button": 1,
         "action": "ZoomToMouse",

@@ -217,17 +217,72 @@ ShareDataSetRoot(
 )
 ```
 
+### Draggable Annotations with Lines
+
+You can add interactive 3D annotations (either singular or plural) that display HTML cards anchored at 3D world coordinates. If `draggable=True` is set, cards can be moved in screen space, and their updated coordinates will be unprojected back into 3D world space. Fired release events can update state via Python callbacks.
+
+```python
+from refast.components import Container, Text
+from refast_vtk_js import View, Annotation, Annotations
+
+async def handle_annotation_drag(ctx):
+    pos = ctx.event_data.get("cardPosition")
+    print(f"Annotation moved to: {pos}")
+
+View(
+    children=[
+        # 1. Singular Annotation with custom Refast HTML children and a blue connecting line
+        Annotation(
+            position=[0.0, 0.5, 0.0],
+            card_position=[0.25, 0.75, 0.25],
+            show_line=True,
+            line_color="#3b82f6",
+            line_width=2.0,
+            draggable=True,
+            on_card_position_change=ctx.callback(handle_annotation_drag),
+            anchor="bottom-center",
+            bg_color="white",
+            children=[
+                Container(
+                    class_name="bg-white border rounded p-2 text-black text-xs font-semibold",
+                    children=[Text("Peak Annotation")],
+                )
+            ]
+        ),
+        # 2. Plural Annotations with simple text labels
+        Annotations(
+            items=[
+                {
+                    "position": [-0.5, 0.0, 0.0],
+                    "text": "Left Annotation",
+                    "anchor": "right-center",
+                    "bg_color": "rgba(16, 185, 129, 0.9)",
+                }
+            ],
+            show_line=True,
+            line_color="#10b981",
+            draggable=True,
+        )
+    ]
+)
+```
+
 ## Available Components
 
 ### View Components
 - `View` - Main 3D view container
 - `MultiViewRoot` - Container for multiple synchronized views
 
+### Annotation Components
+- `Annotation` - Render custom HTML children at a 3D world coordinate (supports dragging, lines, anchors)
+- `Annotations` - Render multiple text-based overlays at 3D world coordinates (supports dragging, lines, anchors)
+
 ### Representation Components
 - `GeometryRepresentation` - For surfaces, meshes, point clouds
 - `Geometry2DRepresentation` - For 2D overlays
 - `VolumeRepresentation` - For volume rendering
 - `SliceRepresentation` - For 2D slices of 3D data
+
 
 ### Dataset Components
 - `PolyData` - Polygonal geometry (points, lines, triangles)
