@@ -9,6 +9,8 @@ from refast.extensions import Extension
 
 from .components import (
     Algorithm,
+    Annotation,
+    Annotations,
     AxesActor,
     CellData,
     DataArray,
@@ -106,6 +108,8 @@ class VtkExtension(Extension):
             ShareDataSetRoot,
             RegisterDataSet,
             UseDataSet,
+            Annotation,
+            Annotations,
         ]
 
 
@@ -114,6 +118,8 @@ __all__ = [
     "VtkExtension",
     # View components
     "View",
+    "Annotation",
+    "Annotations",
     "AxesActor",
     "MultiViewRoot",
     # Representation components

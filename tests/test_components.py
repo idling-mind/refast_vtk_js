@@ -1,4 +1,4 @@
-from refast_vtk_js import ThresholdPoints
+from refast_vtk_js import ThresholdPoints, Annotation, Annotations
 
 def test_threshold_points_basic():
     # Test single criteria dictionary initialization (should be wrapped in a list)
@@ -46,3 +46,21 @@ def test_threshold_points_with_children():
     result = comp.render()
     
     assert result["children"] == ["child_node"]
+
+
+def test_annotation_basic():
+    comp = Annotation(position=[1.0, 2.0, 3.0], children=["hello label"])
+    result = comp.render()
+
+    assert result["type"] == "VtkAnnotation"
+    assert result["props"]["position"] == [1.0, 2.0, 3.0]
+    assert result["children"] == ["hello label"]
+
+
+def test_annotations_basic():
+    items = [{"position": [1.0, 2.0, 3.0], "text": "hello"}]
+    comp = Annotations(items=items)
+    result = comp.render()
+
+    assert result["type"] == "VtkAnnotations"
+    assert result["props"]["items"] == items

@@ -1641,3 +1641,77 @@ class UseDataSet(Component):
             },
             "children": self._render_children(),
         }
+
+
+class Annotation(Component):
+    """
+    Component for rendering 2D HTML/Refast overlays at a 3D position in the viewport.
+
+    Args:
+        position: List of 3 floats [x, y, z] in world coordinates (required)
+        children: Optional child components to render inside the annotation
+        id: Component ID
+        class_name: CSS classes
+    """
+
+    component_type = "VtkAnnotation"
+
+    def __init__(
+        self,
+        position: list[float],
+        children: list["Component | str"] | None = None,
+        id: str | None = None,
+        class_name: str = "",
+        extra_props: dict[str, Any] | None = None,
+    ):
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
+        self.position = position
+        if children:
+            self._children = children
+
+    def render(self) -> dict[str, Any]:
+        return {
+            "type": self.component_type,
+            "id": self.id,
+            "props": {
+                "position": self.position,
+                "class_name": self.class_name,
+                **self._serialize_extra_props(),
+            },
+            "children": self._render_children(),
+        }
+
+
+class Annotations(Component):
+    """
+    Component for rendering multiple 2D HTML overlays at 3D positions in the viewport.
+
+    Args:
+        items: List of dictionaries. Each dictionary must have 'position' [x, y, z] and 'text' [string].
+        id: Component ID
+        class_name: CSS classes
+    """
+
+    component_type = "VtkAnnotations"
+
+    def __init__(
+        self,
+        items: list[dict[str, Any]] | None = None,
+        id: str | None = None,
+        class_name: str = "",
+        extra_props: dict[str, Any] | None = None,
+    ):
+        super().__init__(id=id, class_name=class_name, extra_props=extra_props)
+        self.items = items or []
+
+    def render(self) -> dict[str, Any]:
+        return {
+            "type": self.component_type,
+            "id": self.id,
+            "props": {
+                "items": self.items,
+                "class_name": self.class_name,
+                **self._serialize_extra_props(),
+            },
+            "children": self._render_children(),
+        }

@@ -31,6 +31,8 @@ import {
   VtkShareDataSetRoot,
   VtkRegisterDataSet,
   VtkUseDataSet,
+  VtkAnnotation,
+  VtkAnnotations,
 } from './VtkComponents';
 
 // Type definition for RefastClient
@@ -81,6 +83,8 @@ const COMPONENTS: Record<string, React.ComponentType<unknown>> = {
   VtkShareDataSetRoot: VtkShareDataSetRoot as React.ComponentType<unknown>,
   VtkRegisterDataSet: VtkRegisterDataSet as React.ComponentType<unknown>,
   VtkUseDataSet: VtkUseDataSet as React.ComponentType<unknown>,
+  VtkAnnotation: VtkAnnotation as React.ComponentType<unknown>,
+  VtkAnnotations: VtkAnnotations as React.ComponentType<unknown>,
 };
 
 /**
@@ -141,4 +145,6 @@ export {
   VtkShareDataSetRoot,
   VtkRegisterDataSet,
   VtkUseDataSet,
+  VtkAnnotation,
+  VtkAnnotations,
 };

@@ -6,7 +6,8 @@
  * and callback invocation.
  */
 
-import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // Import VTK.js rendering profiles
 import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
@@ -1939,3 +1940,254 @@ export const VtkUseDataSet: React.FC<VtkUseDataSetProps> = (props) => {
 };
 
 VtkUseDataSet.displayName = 'VtkUseDataSet';
+
+
+interface VtkAnnotationProps {
+  position: [number, number, number];
+  children?: React.ReactNode;
+  'data-refast-id'?: string;
+}
+
+export const VtkAnnotation: React.FC<VtkAnnotationProps> = (props) => {
+  const { position, children } = props;
+  const renderer = useRendererContext();
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const [screenPos, setScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
+    x: 0,
+    y: 0,
+    visible: false,
+  });
+
+  const updatePosition = useCallback((view: any, vtkRenderer: any, container: HTMLElement) => {
+    if (!position || position.length !== 3) {
+      setScreenPos((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+      return;
+    }
+
+    const display = view.worldToDisplay(position[0], position[1], position[2], vtkRenderer);
+
+    // Depth check: if point is clipped behind or far from the camera, hide it
+    if (display[2] < 0 || display[2] > 1) {
+      setScreenPos((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+      return;
+    }
+
+    const x = display[0];
+    const y = container.clientHeight - display[1];
+
+    setScreenPos({
+      x,
+      y,
+      visible: true,
+    });
+  }, [position]);
+
+  useEffect(() => {
+    const vtkRenderer = renderer.get?.();
+    if (!vtkRenderer) return;
+
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+    if (!interactor) return;
+
+    const container = interactor.getContainer?.();
+    const view = interactor.getView?.();
+    if (!container || !view) return;
+
+    setPortalTarget(container);
+    updatePosition(view, vtkRenderer, container);
+
+    const subscriptions: Array<{ unsubscribe: () => void }> = [];
+
+    const camera = vtkRenderer.getActiveCamera?.();
+    if (camera?.onModified) {
+      subscriptions.push(camera.onModified(() => updatePosition(view, vtkRenderer, container)));
+    }
+    if (interactor.onAnimation) {
+      subscriptions.push(interactor.onAnimation(() => updatePosition(view, vtkRenderer, container)));
+    }
+    if (interactor.onEndAnimation) {
+      subscriptions.push(interactor.onEndAnimation(() => updatePosition(view, vtkRenderer, container)));
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updatePosition(view, vtkRenderer, container);
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      for (const sub of subscriptions) {
+        sub.unsubscribe();
+      }
+    };
+  }, [renderer, updatePosition]);
+
+  if (!portalTarget || !screenPos.visible) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      style={{
+        position: 'absolute',
+        left: `${screenPos.x}px`,
+        top: `${screenPos.y}px`,
+        transform: 'translate(-50%, -100%)',
+        pointerEvents: 'auto',
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingBottom: '8px',
+      }}
+    >
+      <div className="relative pointer-events-auto">
+        {children}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800/90" />
+      </div>
+    </div>,
+    portalTarget
+  );
+};
+
+VtkAnnotation.displayName = 'VtkAnnotation';
+
+
+interface AnnotationItem {
+  position: [number, number, number];
+  text: string;
+  color?: string;
+  bgColor?: string;
+}
+
+interface VtkAnnotationsProps {
+  items?: AnnotationItem[];
+  'data-refast-id'?: string;
+}
+
+export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
+  const { items = [] } = props;
+  const renderer = useRendererContext();
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const [coords, setCoords] = useState<Array<{ x: number; y: number; visible: boolean; text: string }>>([]);
+
+  const updatePositions = useCallback((view: any, vtkRenderer: any, container: HTMLElement) => {
+    if (!items || items.length === 0) {
+      setCoords([]);
+      return;
+    }
+
+    const updated = items.map((item) => {
+      const pos = item.position;
+      if (!pos || pos.length !== 3) {
+        return { x: 0, y: 0, visible: false, text: item.text };
+      }
+
+      const display = view.worldToDisplay(pos[0], pos[1], pos[2], vtkRenderer);
+
+      if (display[2] < 0 || display[2] > 1) {
+        return { x: 0, y: 0, visible: false, text: item.text };
+      }
+
+      const x = display[0];
+      const y = container.clientHeight - display[1];
+
+      return {
+        x,
+        y,
+        visible: true,
+        text: item.text,
+      };
+    });
+
+    setCoords(updated);
+  }, [items]);
+
+  useEffect(() => {
+    const vtkRenderer = renderer.get?.();
+    if (!vtkRenderer) return;
+
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+    if (!interactor) return;
+
+    const container = interactor.getContainer?.();
+    const view = interactor.getView?.();
+    if (!container || !view) return;
+
+    setPortalTarget(container);
+    updatePositions(view, vtkRenderer, container);
+
+    const subscriptions: Array<{ unsubscribe: () => void }> = [];
+
+    const camera = vtkRenderer.getActiveCamera?.();
+    if (camera?.onModified) {
+      subscriptions.push(camera.onModified(() => updatePositions(view, vtkRenderer, container)));
+    }
+    if (interactor.onAnimation) {
+      subscriptions.push(interactor.onAnimation(() => updatePositions(view, vtkRenderer, container)));
+    }
+    if (interactor.onEndAnimation) {
+      subscriptions.push(interactor.onEndAnimation(() => updatePositions(view, vtkRenderer, container)));
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updatePositions(view, vtkRenderer, container);
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      for (const sub of subscriptions) {
+        sub.unsubscribe();
+      }
+    };
+  }, [renderer, updatePositions]);
+
+  if (!portalTarget || coords.length === 0) {
+    return null;
+  }
+
+  return createPortal(
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 50,
+      }}
+    >
+      {coords.map((coord, index) => {
+        if (!coord.visible) return null;
+        return (
+          <div
+            key={index}
+            style={{
+              position: 'absolute',
+              left: `${coord.x}px`,
+              top: `${coord.y}px`,
+              transform: 'translate(-50%, -100%)',
+              pointerEvents: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              paddingBottom: '8px',
+            }}
+          >
+            <div className="relative pointer-events-auto bg-slate-900/90 text-white border border-slate-700/80 rounded px-2 py-1 text-xs font-mono shadow-lg whitespace-nowrap">
+              {coord.text.split('\n').map((line, lIdx) => (
+                <div key={lIdx}>{line}</div>
+              ))}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800/90" />
+            </div>
+          </div>
+        );
+      })}
+    </div>,
+    portalTarget
+  );
+};
+
+VtkAnnotations.displayName = 'VtkAnnotations';
