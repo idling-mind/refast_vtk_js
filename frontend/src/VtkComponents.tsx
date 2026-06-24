@@ -2051,77 +2051,107 @@ export const VtkAnnotation: React.FC<VtkAnnotationProps> = (props) => {
     if ((el as any).__cleanupDrag) {
       (el as any).__cleanupDrag();
     }
-    if (!draggable) return;
 
-    const onPointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return; // Left click only
-
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'BUTTON' ||
-        target.tagName === 'INPUT' ||
-        target.tagName === 'SELECT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'A' ||
-        target.closest('button') ||
-        target.closest('a')
-      ) {
-        return;
-      }
-
-      e.preventDefault();
+    // Always stop propagation of interaction events to prevent VTK picking / camera interaction
+    const stopPropagation = (e: Event) => {
       e.stopPropagation();
-
-      const vtkRenderer = renderer.get?.();
-      if (!vtkRenderer) return;
-      const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
-      if (!interactor) return;
-      const container = interactor.getContainer?.();
-      const view = interactor.getView?.();
-      if (!container || !view) return;
-
-      const currentCard = activeCardPosRef.current || cardPositionRef.current || positionRef.current;
-      const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const startDisplayX = displayPos[0];
-      const startDisplayY = displayPos[1];
-      const depthZ = displayPos[2];
-
-      let latestWorld: [number, number, number] = [...currentCard];
-
-      const onPointerMove = (moveEvt: PointerEvent) => {
-        const dx = moveEvt.clientX - startX;
-        const dy = moveEvt.clientY - startY;
-
-        const newDisplayX = startDisplayX + dx;
-        const newDisplayY = startDisplayY - dy;
-
-        const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
-        if (newWorld && newWorld.length === 3) {
-          latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
-          setActiveCardPos(latestWorld);
-        }
-      };
-
-      const onPointerUp = () => {
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-
-        if (onCardPositionChangeRef.current) {
-          onCardPositionChangeRef.current({ cardPosition: latestWorld });
-        }
-      };
-
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp);
     };
 
-    el.addEventListener('pointerdown', onPointerDown);
+    const eventsToStop = [
+      'pointerdown',
+      'pointerup',
+      'pointermove',
+      'click',
+      'mousedown',
+      'mouseup',
+      'mousemove',
+      'contextmenu',
+    ];
+
+    eventsToStop.forEach((evt) => {
+      el.addEventListener(evt, stopPropagation);
+    });
+
+    let cleanupDragHandler = () => {};
+
+    if (draggable) {
+      const onPointerDown = (e: PointerEvent) => {
+        if (e.button !== 0) return; // Left click only
+
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === 'BUTTON' ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'SELECT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'A' ||
+          target.closest('button') ||
+          target.closest('a')
+        ) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const vtkRenderer = renderer.get?.();
+        if (!vtkRenderer) return;
+        const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+        if (!interactor) return;
+        const container = interactor.getContainer?.();
+        const view = interactor.getView?.();
+        if (!container || !view) return;
+
+        const currentCard = activeCardPosRef.current || cardPositionRef.current || positionRef.current;
+        const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startDisplayX = displayPos[0];
+        const startDisplayY = displayPos[1];
+        const depthZ = displayPos[2];
+
+        let latestWorld: [number, number, number] = [...currentCard];
+
+        const onPointerMove = (moveEvt: PointerEvent) => {
+          const dx = moveEvt.clientX - startX;
+          const dy = moveEvt.clientY - startY;
+
+          const newDisplayX = startDisplayX + dx;
+          const newDisplayY = startDisplayY - dy;
+
+          const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
+          if (newWorld && newWorld.length === 3) {
+            latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
+            setActiveCardPos(latestWorld);
+          }
+        };
+
+        const onPointerUp = () => {
+          window.removeEventListener('pointermove', onPointerMove, { capture: true });
+          window.removeEventListener('pointerup', onPointerUp, { capture: true });
+
+          if (onCardPositionChangeRef.current) {
+            onCardPositionChangeRef.current({ cardPosition: latestWorld });
+          }
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { capture: true });
+        window.addEventListener('pointerup', onPointerUp, { capture: true });
+      };
+
+      el.addEventListener('pointerdown', onPointerDown);
+
+      cleanupDragHandler = () => {
+        el.removeEventListener('pointerdown', onPointerDown);
+      };
+    }
 
     (el as any).__cleanupDrag = () => {
-      el.removeEventListener('pointerdown', onPointerDown);
+      eventsToStop.forEach((evt) => {
+        el.removeEventListener(evt, stopPropagation);
+      });
+      cleanupDragHandler();
     };
   }, [draggable, renderer]);
 
@@ -2392,7 +2422,11 @@ export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
     if ((el as any).__cleanupDrag) {
       (el as any).__cleanupDrag();
     }
-    if (!draggable) return;
+
+    // Always stop propagation of interaction events to prevent VTK picking / camera interaction
+    const stopPropagation = (e: Event) => {
+      e.stopPropagation();
+    };
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return; // Left click only
@@ -2413,63 +2447,110 @@ export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const vtkRenderer = renderer.get?.();
-      if (!vtkRenderer) return;
-      const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
-      if (!interactor) return;
-      const container = interactor.getContainer?.();
-      const view = interactor.getView?.();
-      if (!container || !view) return;
-
-      const currentItems = itemsRef.current;
-      const item = currentItems[index];
-      if (!item) return;
-
-      const currentCard = localCardPositionsRef.current[index] || item.cardPosition || (item as any).card_position || item.position;
-      const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
-
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const startDisplayX = displayPos[0];
-      const startDisplayY = displayPos[1];
-      const depthZ = displayPos[2];
-
-      let latestWorld: [number, number, number] = [...currentCard];
-
-      const onPointerMove = (moveEvt: PointerEvent) => {
-        const dx = moveEvt.clientX - startX;
-        const dy = moveEvt.clientY - startY;
-
-        const newDisplayX = startDisplayX + dx;
-        const newDisplayY = startDisplayY - dy;
-
-        const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
-        if (newWorld && newWorld.length === 3) {
-          latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
-          setLocalCardPositions((prev) => ({
-            ...prev,
-            [index]: latestWorld,
-          }));
-        }
-      };
-
-      const onPointerUp = () => {
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-
-        if (onCardPositionChangeRef.current) {
-          onCardPositionChangeRef.current({ index, cardPosition: latestWorld });
-        }
-      };
-
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp);
     };
 
-    el.addEventListener('pointerdown', onPointerDown);
+    const eventsToStop = [
+      'pointerdown',
+      'pointerup',
+      'pointermove',
+      'click',
+      'mousedown',
+      'mouseup',
+      'mousemove',
+      'contextmenu',
+    ];
+
+    eventsToStop.forEach((evt) => {
+      el.addEventListener(evt, stopPropagation);
+    });
+
+    let cleanupDragHandler = () => {};
+
+    if (draggable) {
+      const onPointerDown = (e: PointerEvent) => {
+        if (e.button !== 0) return; // Left click only
+
+        const target = e.target as HTMLElement;
+        if (
+          target.tagName === 'BUTTON' ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'SELECT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'A' ||
+          target.closest('button') ||
+          target.closest('a')
+        ) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const vtkRenderer = renderer.get?.();
+        if (!vtkRenderer) return;
+        const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+        if (!interactor) return;
+        const container = interactor.getContainer?.();
+        const view = interactor.getView?.();
+        if (!container || !view) return;
+
+        const currentItems = itemsRef.current;
+        const item = currentItems[index];
+        if (!item) return;
+
+        const currentCard = localCardPositionsRef.current[index] || item.cardPosition || (item as any).card_position || item.position;
+        const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startDisplayX = displayPos[0];
+        const startDisplayY = displayPos[1];
+        const depthZ = displayPos[2];
+
+        let latestWorld: [number, number, number] = [...currentCard];
+
+        const onPointerMove = (moveEvt: PointerEvent) => {
+          const dx = moveEvt.clientX - startX;
+          const dy = moveEvt.clientY - startY;
+
+          const newDisplayX = startDisplayX + dx;
+          const newDisplayY = startDisplayY - dy;
+
+          const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
+          if (newWorld && newWorld.length === 3) {
+            latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
+            setLocalCardPositions((prev) => ({
+              ...prev,
+              [index]: latestWorld,
+            }));
+          }
+        };
+
+        const onPointerUp = () => {
+          window.removeEventListener('pointermove', onPointerMove, { capture: true });
+          window.removeEventListener('pointerup', onPointerUp, { capture: true });
+
+          if (onCardPositionChangeRef.current) {
+            onCardPositionChangeRef.current({ index, cardPosition: latestWorld });
+          }
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { capture: true });
+        window.addEventListener('pointerup', onPointerUp, { capture: true });
+      };
+
+      el.addEventListener('pointerdown', onPointerDown);
+
+      cleanupDragHandler = () => {
+        el.removeEventListener('pointerdown', onPointerDown);
+      };
+    }
 
     (el as any).__cleanupDrag = () => {
-      el.removeEventListener('pointerdown', onPointerDown);
+      eventsToStop.forEach((evt) => {
+        el.removeEventListener(evt, stopPropagation);
+      });
+      cleanupDragHandler();
     };
   }, [draggable, renderer]);
 
