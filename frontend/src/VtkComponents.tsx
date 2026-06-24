@@ -1942,46 +1942,226 @@ export const VtkUseDataSet: React.FC<VtkUseDataSetProps> = (props) => {
 VtkUseDataSet.displayName = 'VtkUseDataSet';
 
 
+const ANCHOR_TRANSFORMS: Record<string, string> = {
+  'top-left': 'translate(0%, 0%)',
+  'top-center': 'translate(-50%, 0%)',
+  'top-middle': 'translate(-50%, 0%)',
+  'top-right': 'translate(-100%, 0%)',
+  'bottom-left': 'translate(0%, -100%)',
+  'bottom-center': 'translate(-50%, -100%)',
+  'bottom-middle': 'translate(-50%, -100%)',
+  'bottom-right': 'translate(-100%, -100%)',
+  'left-center': 'translate(0%, -50%)',
+  'left-middle': 'translate(0%, -50%)',
+  'right-center': 'translate(-100%, -50%)',
+  'right-middle': 'translate(-100%, -50%)',
+  'center': 'translate(-50%, -50%)',
+  'middle': 'translate(-50%, -50%)',
+};
+
+
 interface VtkAnnotationProps {
   position: [number, number, number];
+  cardPosition?: [number, number, number];
+  showLine?: boolean;
+  lineColor?: string;
+  lineWidth?: number;
+  draggable?: boolean;
+  onCardPositionChange?: (data: { cardPosition: [number, number, number] }) => void;
+  anchor?: string;
+  bgColor?: string;
   children?: React.ReactNode;
   'data-refast-id'?: string;
 }
 
 export const VtkAnnotation: React.FC<VtkAnnotationProps> = (props) => {
-  const { position, children } = props;
+  const rawProps = props as any;
+  const position = props.position || rawProps.position;
+  const cardPosition = props.cardPosition || rawProps.card_position;
+  const showLine = props.showLine !== undefined ? props.showLine : (rawProps.show_line !== undefined ? rawProps.show_line : false);
+  const lineColor = props.lineColor || rawProps.line_color || '#cbd5e1';
+  const lineWidth = props.lineWidth !== undefined ? props.lineWidth : (rawProps.line_width !== undefined ? rawProps.line_width : 1);
+  const draggable = props.draggable !== undefined ? props.draggable : (rawProps.draggable !== undefined ? rawProps.draggable : false);
+  const onCardPositionChange = props.onCardPositionChange || rawProps.on_card_position_change;
+  const anchor = props.anchor || rawProps.anchor || 'bottom-center';
+  const bgColor = props.bgColor || rawProps.bg_color || 'rgba(15, 23, 42, 0.9)';
+  const children = props.children;
+
   const renderer = useRendererContext();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const [screenPos, setScreenPos] = useState<{ x: number; y: number; visible: boolean }>({
-    x: 0,
-    y: 0,
+  const [rendererReady, setRendererReady] = useState(false);
+  const [screenPos, setScreenPos] = useState<{
+    anchorX: number;
+    anchorY: number;
+    cardX: number;
+    cardY: number;
+    visible: boolean;
+  }>({
+    anchorX: 0,
+    anchorY: 0,
+    cardX: 0,
+    cardY: 0,
     visible: false,
   });
 
+  const [activeCardPos, setActiveCardPos] = useState<[number, number, number] | undefined>(cardPosition);
+
+  // Sync state if prop changes
+  useEffect(() => {
+    setActiveCardPos(cardPosition);
+  }, [cardPosition]);
+
+  // Keep latest values in refs for static listeners
+  const positionRef = useRef(position);
+  const cardPositionRef = useRef(cardPosition);
+  const activeCardPosRef = useRef(activeCardPos);
+  const onCardPositionChangeRef = useRef(onCardPositionChange);
+
+  useEffect(() => { positionRef.current = position; }, [position]);
+  useEffect(() => { cardPositionRef.current = cardPosition; }, [cardPosition]);
+  useEffect(() => { activeCardPosRef.current = activeCardPos; }, [activeCardPos]);
+  useEffect(() => { onCardPositionChangeRef.current = onCardPositionChange; }, [onCardPositionChange]);
+
+  const anchorStr = typeof anchor === 'string' ? anchor : 'bottom-center';
+
+  // Wait/poll for the renderer to be ready on page refresh
+  useEffect(() => {
+    if (rendererReady) return;
+    let active = true;
+
+    const checkRenderer = () => {
+      const vtkRenderer = renderer.get?.();
+      if (vtkRenderer) {
+        if (active) setRendererReady(true);
+      } else {
+        if (active) requestAnimationFrame(checkRenderer);
+      }
+    };
+
+    checkRenderer();
+
+    return () => {
+      active = false;
+    };
+  }, [renderer, rendererReady]);
+
+  // Prevent native events from bubbling and handle native dragging
+  const attachNativeDrag = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    if ((el as any).__cleanupDrag) {
+      (el as any).__cleanupDrag();
+    }
+    if (!draggable) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // Left click only
+
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'A' ||
+        target.closest('button') ||
+        target.closest('a')
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const vtkRenderer = renderer.get?.();
+      if (!vtkRenderer) return;
+      const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+      if (!interactor) return;
+      const container = interactor.getContainer?.();
+      const view = interactor.getView?.();
+      if (!container || !view) return;
+
+      const currentCard = activeCardPosRef.current || cardPositionRef.current || positionRef.current;
+      const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startDisplayX = displayPos[0];
+      const startDisplayY = displayPos[1];
+      const depthZ = displayPos[2];
+
+      let latestWorld: [number, number, number] = [...currentCard];
+
+      const onPointerMove = (moveEvt: PointerEvent) => {
+        const dx = moveEvt.clientX - startX;
+        const dy = moveEvt.clientY - startY;
+
+        const newDisplayX = startDisplayX + dx;
+        const newDisplayY = startDisplayY - dy;
+
+        const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
+        if (newWorld && newWorld.length === 3) {
+          latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
+          setActiveCardPos(latestWorld);
+        }
+      };
+
+      const onPointerUp = () => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+
+        if (onCardPositionChangeRef.current) {
+          onCardPositionChangeRef.current({ cardPosition: latestWorld });
+        }
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    };
+
+    el.addEventListener('pointerdown', onPointerDown);
+
+    (el as any).__cleanupDrag = () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [draggable, renderer]);
+
   const updatePosition = useCallback((view: any, vtkRenderer: any, container: HTMLElement) => {
-    if (!position || position.length !== 3) {
+    const pos = positionRef.current;
+    if (!pos || pos.length !== 3) {
       setScreenPos((prev) => (prev.visible ? { ...prev, visible: false } : prev));
       return;
     }
 
-    const display = view.worldToDisplay(position[0], position[1], position[2], vtkRenderer);
+    const currentCard = activeCardPosRef.current || cardPositionRef.current || pos;
 
-    // Depth check: if point is clipped behind or far from the camera, hide it
-    if (display[2] < 0 || display[2] > 1) {
+    const displayAnchor = view.worldToDisplay(pos[0], pos[1], pos[2], vtkRenderer);
+    const displayCard = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
+
+    // Depth check: if anchor point is clipped behind or far from the camera, hide it
+    if (displayAnchor[2] < 0 || displayAnchor[2] > 1) {
       setScreenPos((prev) => (prev.visible ? { ...prev, visible: false } : prev));
       return;
     }
 
-    const x = display[0];
-    const y = container.clientHeight - display[1];
+    const xAnchor = displayAnchor[0];
+    const yAnchor = container.clientHeight - displayAnchor[1];
+
+    const xCard = displayCard[0];
+    const yCard = container.clientHeight - displayCard[1];
 
     setScreenPos({
-      x,
-      y,
+      anchorX: xAnchor,
+      anchorY: yAnchor,
+      cardX: xCard,
+      cardY: yCard,
       visible: true,
     });
-  }, [position]);
+  }, []);
 
+  const updatePositionRef = useRef(updatePosition);
+  updatePositionRef.current = updatePosition;
+
+  // Setup static subscriptions once the renderer is ready
   useEffect(() => {
     const vtkRenderer = renderer.get?.();
     if (!vtkRenderer) return;
@@ -1994,23 +2174,29 @@ export const VtkAnnotation: React.FC<VtkAnnotationProps> = (props) => {
     if (!container || !view) return;
 
     setPortalTarget(container);
-    updatePosition(view, vtkRenderer, container);
+    updatePositionRef.current(view, vtkRenderer, container);
 
     const subscriptions: Array<{ unsubscribe: () => void }> = [];
 
     const camera = vtkRenderer.getActiveCamera?.();
     if (camera?.onModified) {
-      subscriptions.push(camera.onModified(() => updatePosition(view, vtkRenderer, container)));
+      subscriptions.push(camera.onModified(() => {
+        updatePositionRef.current?.(view, vtkRenderer, container);
+      }));
     }
     if (interactor.onAnimation) {
-      subscriptions.push(interactor.onAnimation(() => updatePosition(view, vtkRenderer, container)));
+      subscriptions.push(interactor.onAnimation(() => {
+        updatePositionRef.current?.(view, vtkRenderer, container);
+      }));
     }
     if (interactor.onEndAnimation) {
-      subscriptions.push(interactor.onEndAnimation(() => updatePosition(view, vtkRenderer, container)));
+      subscriptions.push(interactor.onEndAnimation(() => {
+        updatePositionRef.current?.(view, vtkRenderer, container);
+      }));
     }
 
     const resizeObserver = new ResizeObserver(() => {
-      updatePosition(view, vtkRenderer, container);
+      updatePositionRef.current?.(view, vtkRenderer, container);
     });
     resizeObserver.observe(container);
 
@@ -2020,30 +2206,86 @@ export const VtkAnnotation: React.FC<VtkAnnotationProps> = (props) => {
         sub.unsubscribe();
       }
     };
-  }, [renderer, updatePosition]);
+  }, [renderer, rendererReady]);
+
+  // Recalculate screen position immediately when card coordinates change
+  useEffect(() => {
+    const vtkRenderer = renderer.get?.();
+    if (!vtkRenderer) return;
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+    const container = interactor?.getContainer?.();
+    const view = interactor?.getView?.();
+    if (!container || !view) return;
+
+    updatePosition(view, vtkRenderer, container);
+  }, [activeCardPos, updatePosition, renderer]);
 
   if (!portalTarget || !screenPos.visible) {
     return null;
   }
 
+  const isOffset = screenPos.anchorX !== screenPos.cardX || screenPos.anchorY !== screenPos.cardY;
+  const hasLine = showLine && isOffset;
+  const paddingBottom = hasLine ? '0px' : '8px';
+
   return createPortal(
     <div
       style={{
         position: 'absolute',
-        left: `${screenPos.x}px`,
-        top: `${screenPos.y}px`,
-        transform: 'translate(-50%, -100%)',
-        pointerEvents: 'auto',
+        left: 0,
+        top: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
         zIndex: 50,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        paddingBottom: '8px',
       }}
     >
-      <div className="relative pointer-events-auto">
-        {children}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800/90" />
+      {hasLine && (
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 49,
+          }}
+        >
+          <line
+            x1={screenPos.anchorX}
+            y1={screenPos.anchorY}
+            x2={screenPos.cardX}
+            y2={screenPos.cardY}
+            stroke={lineColor}
+            strokeWidth={lineWidth}
+          />
+        </svg>
+      )}
+      <div
+        ref={attachNativeDrag}
+        style={{
+          position: 'absolute',
+          left: `${screenPos.cardX}px`,
+          top: `${screenPos.cardY}px`,
+          transform: ANCHOR_TRANSFORMS[anchorStr] || 'translate(-50%, -100%)',
+          pointerEvents: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingBottom: paddingBottom,
+          cursor: draggable ? 'move' : 'default',
+        }}
+      >
+        <div className="relative pointer-events-auto">
+          {children}
+          {(!showLine || !isOffset) && anchorStr.startsWith('bottom') && (
+            <div
+              className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent"
+              style={{ borderTopColor: bgColor }}
+            />
+          )}
+        </div>
       </div>
     </div>,
     portalTarget
@@ -2055,54 +2297,258 @@ VtkAnnotation.displayName = 'VtkAnnotation';
 
 interface AnnotationItem {
   position: [number, number, number];
+  cardPosition?: [number, number, number];
   text: string;
   color?: string;
   bgColor?: string;
+  anchor?: string;
 }
 
 interface VtkAnnotationsProps {
   items?: AnnotationItem[];
+  showLine?: boolean;
+  lineColor?: string;
+  lineWidth?: number;
+  draggable?: boolean;
+  onCardPositionChange?: (data: { index: number; cardPosition: [number, number, number] }) => void;
+  anchor?: string;
   'data-refast-id'?: string;
 }
 
 export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
-  const { items = [] } = props;
+  const rawProps = props as any;
+  const items = props.items || rawProps.items || [];
+  const showLine = props.showLine !== undefined ? props.showLine : (rawProps.show_line !== undefined ? rawProps.show_line : false);
+  const lineColor = props.lineColor || rawProps.line_color || '#cbd5e1';
+  const lineWidth = props.lineWidth !== undefined ? props.lineWidth : (rawProps.line_width !== undefined ? rawProps.line_width : 1);
+  const draggable = props.draggable !== undefined ? props.draggable : (rawProps.draggable !== undefined ? rawProps.draggable : false);
+  const onCardPositionChange = props.onCardPositionChange || rawProps.on_card_position_change;
+  const anchor = props.anchor || rawProps.anchor || 'bottom-center';
+
+  const defaultAnchorStr = typeof anchor === 'string' ? anchor : 'bottom-center';
+
   const renderer = useRendererContext();
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const [coords, setCoords] = useState<Array<{ x: number; y: number; visible: boolean; text: string }>>([]);
+  const [rendererReady, setRendererReady] = useState(false);
+  const [coords, setCoords] = useState<
+    Array<{
+      anchorX: number;
+      anchorY: number;
+      cardX: number;
+      cardY: number;
+      visible: boolean;
+      text: string;
+      color?: string;
+      bgColor?: string;
+      anchor: string;
+      index: number;
+    }>
+  >([]);
+
+  const [localCardPositions, setLocalCardPositions] = useState<{ [key: number]: [number, number, number] }>({});
+
+  useEffect(() => {
+    setLocalCardPositions({});
+  }, [items]);
+
+  // Keep latest state in refs for static listeners
+  const itemsRef = useRef(items);
+  const localCardPositionsRef = useRef(localCardPositions);
+  const onCardPositionChangeRef = useRef(onCardPositionChange);
+
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { localCardPositionsRef.current = localCardPositions; }, [localCardPositions]);
+  useEffect(() => { onCardPositionChangeRef.current = onCardPositionChange; }, [onCardPositionChange]);
+
+  // Wait/poll for the renderer to be ready on page refresh
+  useEffect(() => {
+    if (rendererReady) return;
+    let active = true;
+
+    const checkRenderer = () => {
+      const vtkRenderer = renderer.get?.();
+      if (vtkRenderer) {
+        if (active) setRendererReady(true);
+      } else {
+        if (active) requestAnimationFrame(checkRenderer);
+      }
+    };
+
+    checkRenderer();
+
+    return () => {
+      active = false;
+    };
+  }, [renderer, rendererReady]);
+
+  // Prevent native events from bubbling and handle native dragging
+  const attachNativeDrag = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const indexAttr = el.getAttribute('data-index');
+    if (indexAttr === null) return;
+    const index = parseInt(indexAttr, 10);
+    if (isNaN(index)) return;
+
+    if ((el as any).__cleanupDrag) {
+      (el as any).__cleanupDrag();
+    }
+    if (!draggable) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // Left click only
+
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'A' ||
+        target.closest('button') ||
+        target.closest('a')
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const vtkRenderer = renderer.get?.();
+      if (!vtkRenderer) return;
+      const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+      if (!interactor) return;
+      const container = interactor.getContainer?.();
+      const view = interactor.getView?.();
+      if (!container || !view) return;
+
+      const currentItems = itemsRef.current;
+      const item = currentItems[index];
+      if (!item) return;
+
+      const currentCard = localCardPositionsRef.current[index] || item.cardPosition || (item as any).card_position || item.position;
+      const displayPos = view.worldToDisplay(currentCard[0], currentCard[1], currentCard[2], vtkRenderer);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startDisplayX = displayPos[0];
+      const startDisplayY = displayPos[1];
+      const depthZ = displayPos[2];
+
+      let latestWorld: [number, number, number] = [...currentCard];
+
+      const onPointerMove = (moveEvt: PointerEvent) => {
+        const dx = moveEvt.clientX - startX;
+        const dy = moveEvt.clientY - startY;
+
+        const newDisplayX = startDisplayX + dx;
+        const newDisplayY = startDisplayY - dy;
+
+        const newWorld = view.displayToWorld(newDisplayX, newDisplayY, depthZ, vtkRenderer);
+        if (newWorld && newWorld.length === 3) {
+          latestWorld = [newWorld[0], newWorld[1], newWorld[2]];
+          setLocalCardPositions((prev) => ({
+            ...prev,
+            [index]: latestWorld,
+          }));
+        }
+      };
+
+      const onPointerUp = () => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+
+        if (onCardPositionChangeRef.current) {
+          onCardPositionChangeRef.current({ index, cardPosition: latestWorld });
+        }
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    };
+
+    el.addEventListener('pointerdown', onPointerDown);
+
+    (el as any).__cleanupDrag = () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [draggable, renderer]);
 
   const updatePositions = useCallback((view: any, vtkRenderer: any, container: HTMLElement) => {
-    if (!items || items.length === 0) {
+    const currentItems = itemsRef.current;
+    if (!currentItems || currentItems.length === 0) {
       setCoords([]);
       return;
     }
 
-    const updated = items.map((item) => {
+    const updated = currentItems.map((item, index) => {
       const pos = item.position;
+      const cardPos = localCardPositionsRef.current[index] || item.cardPosition || (item as any).card_position || pos;
+      const itemAnchor = item.anchor || (item as any).anchor || defaultAnchorStr;
+      const itemAnchorStr = typeof itemAnchor === 'string' ? itemAnchor : 'bottom-center';
+      const itemBgColor = item.bgColor || (item as any).bg_color || 'rgba(15, 23, 42, 0.9)';
+      const itemColor = item.color || (item as any).color;
+      const itemText = item.text || (item as any).text || '';
+
       if (!pos || pos.length !== 3) {
-        return { x: 0, y: 0, visible: false, text: item.text };
+        return {
+          anchorX: 0,
+          anchorY: 0,
+          cardX: 0,
+          cardY: 0,
+          visible: false,
+          text: itemText,
+          color: itemColor,
+          bgColor: itemBgColor,
+          anchor: itemAnchorStr,
+          index,
+        };
       }
 
-      const display = view.worldToDisplay(pos[0], pos[1], pos[2], vtkRenderer);
+      const displayAnchor = view.worldToDisplay(pos[0], pos[1], pos[2], vtkRenderer);
+      const displayCard = view.worldToDisplay(cardPos[0], cardPos[1], cardPos[2], vtkRenderer);
 
-      if (display[2] < 0 || display[2] > 1) {
-        return { x: 0, y: 0, visible: false, text: item.text };
+      if (displayAnchor[2] < 0 || displayAnchor[2] > 1) {
+        return {
+          anchorX: 0,
+          anchorY: 0,
+          cardX: 0,
+          cardY: 0,
+          visible: false,
+          text: itemText,
+          color: itemColor,
+          bgColor: itemBgColor,
+          anchor: itemAnchorStr,
+          index,
+        };
       }
 
-      const x = display[0];
-      const y = container.clientHeight - display[1];
+      const anchorX = displayAnchor[0];
+      const anchorY = container.clientHeight - displayAnchor[1];
+
+      const cardX = displayCard[0];
+      const cardY = container.clientHeight - displayCard[1];
 
       return {
-        x,
-        y,
+        anchorX,
+        anchorY,
+        cardX,
+        cardY,
         visible: true,
-        text: item.text,
+        text: itemText,
+        color: itemColor,
+        bgColor: itemBgColor,
+        anchor: itemAnchorStr,
+        index,
       };
     });
 
     setCoords(updated);
-  }, [items]);
+  }, [defaultAnchorStr]);
 
+  const updatePositionsRef = useRef(updatePositions);
+  updatePositionsRef.current = updatePositions;
+
+  // Setup static subscriptions once the renderer is ready
   useEffect(() => {
     const vtkRenderer = renderer.get?.();
     if (!vtkRenderer) return;
@@ -2115,23 +2561,29 @@ export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
     if (!container || !view) return;
 
     setPortalTarget(container);
-    updatePositions(view, vtkRenderer, container);
+    updatePositionsRef.current(view, vtkRenderer, container);
 
     const subscriptions: Array<{ unsubscribe: () => void }> = [];
 
     const camera = vtkRenderer.getActiveCamera?.();
     if (camera?.onModified) {
-      subscriptions.push(camera.onModified(() => updatePositions(view, vtkRenderer, container)));
+      subscriptions.push(camera.onModified(() => {
+        updatePositionsRef.current?.(view, vtkRenderer, container);
+      }));
     }
     if (interactor.onAnimation) {
-      subscriptions.push(interactor.onAnimation(() => updatePositions(view, vtkRenderer, container)));
+      subscriptions.push(interactor.onAnimation(() => {
+        updatePositionsRef.current?.(view, vtkRenderer, container);
+      }));
     }
     if (interactor.onEndAnimation) {
-      subscriptions.push(interactor.onEndAnimation(() => updatePositions(view, vtkRenderer, container)));
+      subscriptions.push(interactor.onEndAnimation(() => {
+        updatePositionsRef.current?.(view, vtkRenderer, container);
+      }));
     }
 
     const resizeObserver = new ResizeObserver(() => {
-      updatePositions(view, vtkRenderer, container);
+      updatePositionsRef.current?.(view, vtkRenderer, container);
     });
     resizeObserver.observe(container);
 
@@ -2141,7 +2593,19 @@ export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
         sub.unsubscribe();
       }
     };
-  }, [renderer, updatePositions]);
+  }, [renderer, rendererReady]);
+
+  // Recalculate screen positions immediately when items or local positions change
+  useEffect(() => {
+    const vtkRenderer = renderer.get?.();
+    if (!vtkRenderer) return;
+    const interactor = vtkRenderer.getRenderWindow?.()?.getInteractor?.();
+    const container = interactor?.getContainer?.();
+    const view = interactor?.getView?.();
+    if (!container || !view) return;
+
+    updatePositions(view, vtkRenderer, container);
+  }, [items, localCardPositions, updatePositions, renderer]);
 
   if (!portalTarget || coords.length === 0) {
     return null;
@@ -2159,28 +2623,76 @@ export const VtkAnnotations: React.FC<VtkAnnotationsProps> = (props) => {
         zIndex: 50,
       }}
     >
+      {showLine && (
+        <svg
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 49,
+          }}
+        >
+          {coords.map((coord, index) => {
+            const isOffset = coord.anchorX !== coord.cardX || coord.anchorY !== coord.cardY;
+            if (!coord.visible || !isOffset) return null;
+            return (
+              <line
+                key={index}
+                x1={coord.anchorX}
+                y1={coord.anchorY}
+                x2={coord.cardX}
+                y2={coord.cardY}
+                stroke={lineColor}
+                strokeWidth={lineWidth}
+              />
+            );
+          })}
+        </svg>
+      )}
       {coords.map((coord, index) => {
         if (!coord.visible) return null;
+        const isOffset = coord.anchorX !== coord.cardX || coord.anchorY !== coord.cardY;
+        const hasLine = showLine && isOffset;
+        const paddingBottom = hasLine ? '0px' : '8px';
         return (
           <div
             key={index}
+            data-index={index}
+            ref={attachNativeDrag}
             style={{
               position: 'absolute',
-              left: `${coord.x}px`,
-              top: `${coord.y}px`,
-              transform: 'translate(-50%, -100%)',
+              left: `${coord.cardX}px`,
+              top: `${coord.cardY}px`,
+              transform: ANCHOR_TRANSFORMS[coord.anchor] || 'translate(-50%, -100%)',
               pointerEvents: 'auto',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              paddingBottom: '8px',
+              paddingBottom: paddingBottom,
+              cursor: draggable ? 'move' : 'default',
             }}
           >
-            <div className="relative pointer-events-auto bg-slate-900/90 text-white border border-slate-700/80 rounded px-2 py-1 text-xs font-mono shadow-lg whitespace-nowrap">
+            <div
+              className="relative pointer-events-auto bg-slate-900/90 text-white border border-slate-700/80 rounded px-2 py-1 text-xs font-mono shadow-lg whitespace-nowrap"
+              style={{
+                color: coord.color,
+                backgroundColor: coord.bgColor,
+              }}
+            >
               {coord.text.split('\n').map((line, lIdx) => (
                 <div key={lIdx}>{line}</div>
               ))}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800/90" />
+              {(!showLine || !isOffset) && coord.anchor.startsWith('bottom') && (
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 border-[6px] border-transparent"
+                  style={{
+                    borderTopColor: coord.bgColor || 'rgba(15, 23, 42, 0.9)',
+                  }}
+                />
+              )}
             </div>
           </div>
         );

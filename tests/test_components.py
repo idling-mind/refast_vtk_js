@@ -57,6 +57,35 @@ def test_annotation_basic():
     assert result["children"] == ["hello label"]
 
 
+def test_annotation_extended():
+    class MockCallback:
+        def serialize(self):
+            return {"callbackId": "drag-cb-id"}
+
+    comp = Annotation(
+        position=[1.0, 2.0, 3.0],
+        card_position=[1.5, 2.5, 3.5],
+        show_line=True,
+        line_color="#ff0000",
+        line_width=2.5,
+        draggable=True,
+        on_card_position_change=MockCallback(),
+        anchor="top-left",
+        bg_color="rgba(100, 100, 100, 0.5)",
+    )
+    result = comp.render()
+
+    assert result["props"]["card_position"] == [1.5, 2.5, 3.5]
+    assert result["props"]["show_line"] is True
+    assert result["props"]["line_color"] == "#ff0000"
+    assert result["props"]["line_width"] == 2.5
+    assert result["props"]["draggable"] is True
+    assert result["props"]["on_card_position_change"] == {"callbackId": "drag-cb-id"}
+    assert result["props"]["anchor"] == "top-left"
+    assert result["props"]["bg_color"] == "rgba(100, 100, 100, 0.5)"
+
+
+
 def test_annotations_basic():
     items = [{"position": [1.0, 2.0, 3.0], "text": "hello"}]
     comp = Annotations(items=items)
@@ -64,3 +93,38 @@ def test_annotations_basic():
 
     assert result["type"] == "VtkAnnotations"
     assert result["props"]["items"] == items
+
+
+def test_annotations_extended():
+    class MockCallback:
+        def serialize(self):
+            return {"callbackId": "drag-cb-id-plural"}
+
+    items = [
+        {
+            "position": [1.0, 2.0, 3.0],
+            "card_position": [1.5, 2.5, 3.5],
+            "text": "hello",
+            "color": "red",
+            "bg_color": "blue",
+            "anchor": "right-center",
+        }
+    ]
+    comp = Annotations(
+        items=items,
+        show_line=True,
+        line_color="#00ff00",
+        line_width=3.0,
+        draggable=True,
+        on_card_position_change=MockCallback(),
+        anchor="bottom-left",
+    )
+    result = comp.render()
+
+    assert result["props"]["items"] == items
+    assert result["props"]["show_line"] is True
+    assert result["props"]["line_color"] == "#00ff00"
+    assert result["props"]["line_width"] == 3.0
+    assert result["props"]["draggable"] is True
+    assert result["props"]["on_card_position_change"] == {"callbackId": "drag-cb-id-plural"}
+    assert result["props"]["anchor"] == "bottom-left"

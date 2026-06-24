@@ -1649,6 +1649,13 @@ class Annotation(Component):
 
     Args:
         position: List of 3 floats [x, y, z] in world coordinates (required)
+        card_position: Optional list of 3 floats [x, y, z] in world coordinates for the card position
+        show_line: Whether to show a line from position to card_position (default: False)
+        line_color: CSS color string for the connecting line (default: "#cbd5e1")
+        line_width: Width of the connecting line in pixels (default: 1.0)
+        draggable: Whether the card can be dragged by the user (default: False)
+        on_card_position_change: Fired when the card is dragged and released
+        anchor: Point on the card to align with the 3D position (e.g. 'bottom-center', 'top-left', etc.) (default: 'bottom-center')
         children: Optional child components to render inside the annotation
         id: Component ID
         class_name: CSS classes
@@ -1659,6 +1666,14 @@ class Annotation(Component):
     def __init__(
         self,
         position: list[float],
+        card_position: list[float] | None = None,
+        show_line: bool = False,
+        line_color: str = "#cbd5e1",
+        line_width: float = 1.0,
+        draggable: bool = False,
+        on_card_position_change: Any = None,
+        anchor: str = "bottom-center",
+        bg_color: str = "rgba(15, 23, 42, 0.9)",
         children: list["Component | str"] | None = None,
         id: str | None = None,
         class_name: str = "",
@@ -1666,6 +1681,14 @@ class Annotation(Component):
     ):
         super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.position = position
+        self.card_position = card_position
+        self.show_line = show_line
+        self.line_color = line_color
+        self.line_width = line_width
+        self.draggable = draggable
+        self.on_card_position_change = on_card_position_change
+        self.anchor = anchor
+        self.bg_color = bg_color
         if children:
             self._children = children
 
@@ -1675,6 +1698,14 @@ class Annotation(Component):
             "id": self.id,
             "props": {
                 "position": self.position,
+                "card_position": self.card_position,
+                "show_line": self.show_line,
+                "line_color": self.line_color,
+                "line_width": self.line_width,
+                "draggable": self.draggable,
+                "on_card_position_change": self.on_card_position_change.serialize() if self.on_card_position_change else None,
+                "anchor": self.anchor,
+                "bg_color": self.bg_color,
                 "class_name": self.class_name,
                 **self._serialize_extra_props(),
             },
@@ -1682,12 +1713,19 @@ class Annotation(Component):
         }
 
 
+
 class Annotations(Component):
     """
     Component for rendering multiple 2D HTML overlays at 3D positions in the viewport.
 
     Args:
-        items: List of dictionaries. Each dictionary must have 'position' [x, y, z] and 'text' [string].
+        items: List of dictionaries. Each dictionary must have 'position' [x, y, z] and 'text' [string], and optional 'card_position' [x, y, z], 'color', 'bg_color', 'anchor'.
+        show_line: Whether to show connecting lines for all offset items (default: False)
+        line_color: CSS color string for the connecting lines (default: "#cbd5e1")
+        line_width: Width of the connecting lines in pixels (default: 1.0)
+        draggable: Whether the cards can be dragged by the user (default: False)
+        on_card_position_change: Fired when a card is dragged and released
+        anchor: Default point on the cards to align with the 3D position (e.g. 'bottom-center', 'top-left', etc.) (default: 'bottom-center')
         id: Component ID
         class_name: CSS classes
     """
@@ -1697,12 +1735,24 @@ class Annotations(Component):
     def __init__(
         self,
         items: list[dict[str, Any]] | None = None,
+        show_line: bool = False,
+        line_color: str = "#cbd5e1",
+        line_width: float = 1.0,
+        draggable: bool = False,
+        on_card_position_change: Any = None,
+        anchor: str = "bottom-center",
         id: str | None = None,
         class_name: str = "",
         extra_props: dict[str, Any] | None = None,
     ):
         super().__init__(id=id, class_name=class_name, extra_props=extra_props)
         self.items = items or []
+        self.show_line = show_line
+        self.line_color = line_color
+        self.line_width = line_width
+        self.draggable = draggable
+        self.on_card_position_change = on_card_position_change
+        self.anchor = anchor
 
     def render(self) -> dict[str, Any]:
         return {
@@ -1710,6 +1760,12 @@ class Annotations(Component):
             "id": self.id,
             "props": {
                 "items": self.items,
+                "show_line": self.show_line,
+                "line_color": self.line_color,
+                "line_width": self.line_width,
+                "draggable": self.draggable,
+                "on_card_position_change": self.on_card_position_change.serialize() if self.on_card_position_change else None,
+                "anchor": self.anchor,
                 "class_name": self.class_name,
                 **self._serialize_extra_props(),
             },
