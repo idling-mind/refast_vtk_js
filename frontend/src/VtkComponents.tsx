@@ -6,7 +6,7 @@
  * and callback invocation.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 
 // Import VTK.js rendering profiles
 import '@kitware/vtk.js/Rendering/Misc/RenderingAPIs';
@@ -30,6 +30,14 @@ import '@kitware/vtk.js/Filters/Sources/PointSource';
 import '@kitware/vtk.js/Filters/Sources/CircleSource';
 import '@kitware/vtk.js/Filters/Sources/ArrowSource';
 import '@kitware/vtk.js/Filters/Core/ThresholdPoints';
+
+// Import VTK.js IO readers (needed for Reader component to find them by string name)
+import '@kitware/vtk.js/IO/Misc/OBJReader';
+import '@kitware/vtk.js/IO/Geometry/STLReader';
+import '@kitware/vtk.js/IO/Geometry/PLYReader';
+import '@kitware/vtk.js/IO/XML/XMLPolyDataReader';
+import '@kitware/vtk.js/IO/XML/XMLImageDataReader';
+import '@kitware/vtk.js/IO/Core/HttpDataSetReader';
 
 // Import color transfer function presets (required for colorMapPreset to work)
 // The ColorMaps module contains the preset registry that VolumeRepresentation uses
@@ -95,6 +103,11 @@ import {
   ShareDataSetRoot,
   RegisterDataSet,
   UseDataSet,
+  useShareDataSetContext,
+  useRepresentationContext,
+  useDownstreamContext,
+  RepresentationContext,
+  DownstreamContext,
 } from 'react-vtk-js';
 
 // react-vtk-js v2 currently declares scalar bar / cube axes props in types,
@@ -1820,6 +1833,19 @@ export const VtkShareDataSetRoot: React.FC<VtkShareDataSetRootProps> = (props) =
 VtkShareDataSetRoot.displayName = 'VtkShareDataSetRoot';
 
 
+const createEvent = () => {
+  const listeners = new Set<any>();
+  return {
+    addEventListener: (cb: any) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    dispatchEvent: (data?: any) => {
+      listeners.forEach((cb) => cb(data));
+    }
+  };
+};
+
 interface VtkRegisterDataSetProps {
   datasetId: string;
   className?: string;
@@ -1829,7 +1855,49 @@ interface VtkRegisterDataSetProps {
 
 export const VtkRegisterDataSet: React.FC<VtkRegisterDataSetProps> = (props) => {
   const { datasetId, children } = props;
-  return <RegisterDataSet id={datasetId}>{children}</RegisterDataSet>;
+  const share = useShareDataSetContext();
+
+  useEffect(() => {
+    return () => {
+      share.unregister(datasetId);
+    };
+  }, [datasetId, share]);
+
+  const dataChangedEvent = useRef(createEvent());
+  const dataAvailableEvent = useRef(createEvent());
+
+  const downstream = useMemo(() => ({
+    setInputData(obj: any) {
+      share.register(datasetId, obj);
+    },
+    setInputConnection(conn: any) {
+      // FIX: Register the connection function `conn` directly, instead of calling it `conn()` immediately!
+      share.register(datasetId, conn);
+    },
+  }), [datasetId, share]);
+
+  const mockRepresentation = useMemo(() => ({
+    dataChanged() {
+      share.dispatchDataChanged(datasetId);
+      dataChangedEvent.current.dispatchEvent();
+    },
+    dataAvailable() {
+      share.dispatchDataAvailable(datasetId);
+      dataAvailableEvent.current.dispatchEvent();
+    },
+    getActor: () => null,
+    getMapper: () => null,
+    onDataAvailable: (cb: any) => share.onDataAvailable(datasetId, cb),
+    onDataChanged: (cb: any) => share.onDataChanged(datasetId, cb),
+  }), [datasetId, share]);
+
+  return (
+    <RepresentationContext.Provider value={mockRepresentation}>
+      <DownstreamContext.Provider value={downstream}>
+        {children}
+      </DownstreamContext.Provider>
+    </RepresentationContext.Provider>
+  );
 };
 
 VtkRegisterDataSet.displayName = 'VtkRegisterDataSet';
@@ -1843,8 +1911,31 @@ interface VtkUseDataSetProps {
 }
 
 export const VtkUseDataSet: React.FC<VtkUseDataSetProps> = (props) => {
-  const { datasetId, port } = props;
-  return <UseDataSet id={datasetId} port={port} />;
+  const { datasetId, port = 0 } = props;
+  const share = useShareDataSetContext();
+  const representation = useRepresentationContext();
+  const downstream = useDownstreamContext();
+
+  useEffect(() => {
+    return share.onDataAvailable(datasetId, (ds) => {
+      if (typeof ds === 'function') {
+        // It is an output connection function! Connect it directly.
+        downstream.setInputConnection(ds, port);
+      } else {
+        // It is a static dataset!
+        downstream.setInputData(ds, port);
+      }
+      representation.dataAvailable(!!ds);
+    });
+  }, [datasetId, port, representation, downstream, share]);
+
+  useEffect(() => {
+    return share.onDataChanged(datasetId, () => {
+      representation.dataChanged();
+    });
+  }, [datasetId, representation, share]);
+
+  return null;
 };
 
 VtkUseDataSet.displayName = 'VtkUseDataSet';
